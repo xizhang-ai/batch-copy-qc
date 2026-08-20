@@ -13,6 +13,7 @@
 APP_ENV=development
 DATABASE_PATH=./data/batch-copy-qc.sqlite3
 UPLOAD_DIR=./data/uploads
+FRONTEND_DIST_DIR=./frontend/dist
 
 # 模型：开发可使用 fake，真实环境使用 cliproxy
 MODEL_ADAPTER=fake
@@ -21,6 +22,7 @@ CLIPROXY_API_KEY=
 CLIPROXY_GENERATION_MODEL=
 CLIPROXY_QC_MODEL=
 CLIPROXY_REASONING_EFFORT=medium
+CLIPROXY_API_MODE=responses
 MODEL_CONCURRENCY=2
 CLIPROXY_TIMEOUT_SECONDS=120
 AUTO_REWRITE_LIMIT=1
@@ -29,10 +31,12 @@ SIMILARITY_THRESHOLD=85
 QC_CONFIDENCE_THRESHOLD=0.70
 
 # 飞书
-FEISHU_ADAPTER=unconfigured
+FEISHU_ADAPTER=fake
 FEISHU_APP_ID=
 FEISHU_APP_SECRET=
 FEISHU_SPREADSHEET_TOKEN=
+FEISHU_WIKI_NODE_TOKEN=
+FEISHU_BASE_URL=https://open.feishu.cn
 ```
 
 规则：
@@ -44,7 +48,9 @@ FEISHU_SPREADSHEET_TOKEN=
 
 ## 3. 模型适配器
 
-模型供应商固定为 CLIPROXY。`CliProxyModelAdapter` 使用 OpenAI Responses 兼容请求形式：Bearer 鉴权，请求写入 `model`、`instructions`、`input`、`max_output_tokens` 和可选 `reasoning.effort`；响应兼容顶层 `output_text` 及 `output[].content[].text`。任何供应商原始 JSON 都必须先转换成项目内部 Pydantic 类型。
+模型供应商固定为 CLIPROXY。`CliProxyModelAdapter` 默认严格使用 OpenAI Responses 兼容请求形式：Bearer 鉴权，请求写入 `model`、`instructions`、`input`、`max_output_tokens` 和可选 `reasoning.effort`；响应兼容顶层 `output_text` 及 `output[].content[].text`。任何供应商原始 JSON 都必须先转换成项目内部 Pydantic 类型。
+
+`CLIPROXY_API_MODE` 可选值：`responses`（默认且不回退）、`auto`（只在 404/405/501 时回退 Chat Completions）、`chat`（显式旧协议）。400/422 等请求错误不得自动回退，避免掩盖模型或参数配置错误并重复发送 Prompt。
 
 适配器提供六个异步方法：
 
@@ -74,7 +80,8 @@ FEISHU_SPREADSHEET_TOKEN=
 适配器方法：
 
 1. `create_run_sheet(export_run_id, sheet_title) -> sheet_id`
-2. `write_rows(sheet_id, rows) -> None`
+2. `find_run_sheet(sheet_title) -> sheet_id | None`
+3. `write_rows(sheet_id, rows, clear_through_row) -> None`
 
 固定列：
 
@@ -92,8 +99,11 @@ FEISHU_SPREADSHEET_TOKEN=
 幂等规则：
 
 - `export_run_id` 是客户端与服务端共同幂等键。
+- 本地保存项目、生成批次、固定列版本、有序 item-version 和行快照/hash；相同 ID 携带不同内容时返回幂等冲突。
 - 本地已有 `sheet_id` 时，失败重试不得再次创建 Sheet。
+- 子 Sheet 使用清洗后的确定性安全标题并包含 export ID；创建响应丢失时先按标题对账，避免重复创建。
 - 写入采用固定表头和确定行顺序；重试覆盖同一目标范围，不做末尾盲目追加。
+- 新行数少于历史最大行数时，用空值覆盖旧尾行，不能遗留旧文案。
 - 已成功 export run 再次请求返回原结果。
 - 文案在成功输出后又被召回、编辑并重新完成时，创建新的 export run 和新子 Sheet。
 
@@ -112,7 +122,7 @@ FEISHU_SPREADSHEET_TOKEN=
 
 模型：CLIPROXY Base URL、API Key、生成/QC 模型名、实际请求/响应样例、结构化输出能力、并发与频率限制。若实际 endpoint 或字段与 Responses 兼容形式不同，只修改 `CliProxyModelAdapter`。
 
-飞书：App ID、App Secret、Spreadsheet Token、实际权限范围、限流和错误码说明。
+飞书：App ID、App Secret，以及 Spreadsheet Token 或 Wiki Node Token；实际权限范围、限流和错误码说明。Wiki 节点必须解析为 `obj_type=sheet` 后再写入。
 
 ## 6. 合同测试
 

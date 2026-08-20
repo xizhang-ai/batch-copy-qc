@@ -6,8 +6,8 @@
 
 ## 当前阶段
 
-- 状态：长任务实施中
-- 阶段：并行执行 Task 1–20，随后由主智能体集成 Task 21–22
+- 状态：已完成
+- 阶段：Task 1–22 已集成；独立审查官完成三轮全仓终审及冻结版本复核，P0/P1/P2 均为 0
 - 编码边界：保持独立产品与轻量单体；子智能体按目录所有权工作，主智能体负责交叉集成、实网适配和最终验收。
 
 ## 阶段
@@ -18,11 +18,11 @@
 - [x] 阶段 4：编写逐任务实施计划
 - [x] 阶段 5：把爆款参考类型补入需求、数据、API、QC、前端和验收后完成自检
 - [x] 阶段 6：形成长任务执行交接点并停止，不启动编码
-- [ ] 阶段 7：初始化独立仓库和应用骨架
-- [ ] 阶段 8：完成后端领域、持久化、模型/QC/审核/飞书 API
-- [ ] 阶段 9：完成前端项目、类型、规则、看板、审核和输出页面
-- [ ] 阶段 10：全栈联调、实网验证、E2E、Windows 启动与文档收口
-- [ ] 阶段 11：独立审查官终审与问题修复
+- [x] 阶段 7：初始化独立仓库和应用骨架
+- [x] 阶段 8：完成后端领域、持久化、模型/QC/审核/飞书 API
+- [x] 阶段 9：完成前端项目、类型、规则、看板、审核和输出页面
+- [x] 阶段 10：全栈联调、实网验证、E2E、Windows 启动与文档收口
+- [x] 阶段 11：独立审查官终审与问题修复
 
 ## 已冻结决策
 
@@ -51,3 +51,13 @@
 | 参考案例画像与“原帖必须进入 Prompt”存在早期口径差异 | 已纠正 | 原帖完整保存并进入 Prompt，同时保留画像、事实隔离和防照搬 QC |
 | PowerShell 将 if/foreach 结果直接接管道时出现空管道解析错误 | 已解决 | 先赋值到 `$results`，再单独送入 `Format-Table`；后续脚本沿用此模式 |
 | 首次 Git 提交缺少 author identity | 已解决 | 仅为本仓库设置 `Codex <codex@local>`，不修改用户全局 Git 配置 |
+| PowerShell `Start-Process` 重定向路径直接拼接导致参数绑定失败 | 已解决 | 先把日志绝对路径保存为独立变量，再传给 RedirectStandardOutput/Error |
+| Playwright 技能的 Bash wrapper 在本机无 `/bin/bash` | 已解决 | 保持 CLI-first，改用同等的 `npx --package @playwright/cli playwright-cli` 调用 |
+| 单个 apply_patch 同时 Delete/Add 同一路径被拒绝 | 已解决 | 分成先删除、再新增两个补丁，不重复原失败形式 |
+| 审查修复后 Ruff 报 `feishu.py` import 顺序 | 已解决 | 使用 Ruff 单文件自动修复，并重跑全目录检查 |
+| `npm --prefix ... exec` 从仓库根解析了错误的 E2E 配置相对路径 | 已解决 | 固定为前端 `test:e2e` script，并让 Playwright webServer 的 cwd 指向仓库根 |
+| Playwright 升级后缺少对应 Chromium 1234 | 已解决 | 安装项目测试浏览器；失败 trace 位于 Git 忽略目录 |
+| E2E 两处定位器受内联空格和重复“人工通过”影响 | 已解决 | 使用空白容忍正则与 ITEM ID 范围定位，不改业务 UI |
+| Windows PowerShell 5 误解码无 BOM UTF-8 中文脚本 | 已解决 | 三个交付脚本自身只使用 ASCII 文本，兼容旧版和新版 PowerShell |
+| `py -3.12` 未在 Windows Launcher 注册 | 已解决 | 脚本优先使用项目 `.venv`；已用 bundled Python 3.12 建立本地 `.venv` |
+| 类型 Brief 的真实 API 结果没有回填类型编辑字段 | 已解决 | 后端返回可编辑 requirements/约束/项目建议，前端显示拆解与冲突提示且不覆盖项目事实 |

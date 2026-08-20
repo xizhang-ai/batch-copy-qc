@@ -63,3 +63,21 @@
 - `New project 2\content-hub` 是更重的 Next/多包 TypeScript 工程，包含 Drizzle、Worker、素材库和大量既有模块；本产品保持 React/Vite + FastAPI，不复制其框架与业务代码。
 - 只适量参考其 Windows 开发日志隔离、前后端代理验证和 Playwright 组织方式；实际脚本需按本产品单进程 FastAPI 交付重新实现。
 - 当前真实外部配置已通过只读 smoke test：CLIPROXY 两个模型、飞书 tenant token、Wiki 节点解析、电子表格工作表列表均成功。真实写入留到 exporter 完成后用受控测试验证。
+- Windows PATH 上的系统 Python 是 3.14.0，与锁定的 `>=3.12,<3.13` 不符；Codex bundled Python 为 3.12.13，长任务测试和安装统一使用其绝对路径。Node PATH 为 24.x，可满足 Vite/Playwright。
+
+## 2026-08-21 实现与终审结论
+
+- 领域持久化按全部 14 张计划实体表实现，另含 `schema_migrations`；旧 001 数据库通过独立 002 迁移增加飞书幂等字段。
+- CLIPROXY 默认严格 Responses；只有显式 `auto` 才在 404/405/501 回退 Chat，400/422 不回退。
+- 真实 CLIPROXY 解析调用已通过结构验证；一次样例把禁止宣称归类不够理想，属于已冻结的内容质量 P1，不影响框架与合同放行。
+- 飞书 export run 保存不可变行快照/hash、确定性安全 Sheet 名和历史最大写入行；同 ID 不同 payload 冲突，重试会对账并清理旧尾行。
+- 飞书当前并发幂等边界是单进程/单事件循环，因此生产脚本强制 `--workers 1`；未来扩展多 worker 时需数据库 lease/CAS。
+- 类型 Brief 解析结果会回填可编辑类型字段；识别到的项目事实只作为 `project_change_suggestions` 显示，不静默覆盖已确认项目内容。
+- Windows PowerShell 5 对 UTF-8 无 BOM 脚本不可靠；交付脚本使用 ASCII 提示，中文仍保留在产品 UI 和 Markdown 文档。
+- E2E 使用 Fake Adapter，保证测试不会产生模型费用或飞书写入；真实连接另走最小 smoke test。
+- 类型 Brief 审阅使用独立 `brief_review` 数据，不混入生成 requirements；建议和冲突逐条保存内容、来源、置信度与 pending/confirmed/ignored 决定，旧库通过 003 迁移保留数据。
+- QC 规则边界最终确定：project/type hard 同类累加；type soft 覆盖同类 project soft；type soft 试图覆盖 project hard 时产生冲突并阻止生成。
+- 人工直接编辑与选区改写都会同步重新执行确定性、批次/参考相似度和语义 QC；只有复检后已消失的问题会解决，模型失败必须保留旧 finding 并阻止普通通过。
+- 强制通过的“遗留问题”和“放行理由”是两个独立非空字段；前端、后端审核事件和飞书导出使用同一完成原因语义。
+- FastAPI 请求不能与 worker 共享一个 `check_same_thread=False` SQLite 连接；最终实现采用请求级独立连接和 worker 专用连接，并以并发读写回归锁定该边界。
+- 最终独立终审结论为 PASS：后端 100 项、前端 15 项、Mock E2E 5 条、真实栈 E2E 1 条全部通过，生产包与 secrets 检查通过。

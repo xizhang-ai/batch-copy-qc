@@ -1,0 +1,1 @@
+"""Batch copy QC application."""

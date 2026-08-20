@@ -1297,7 +1297,7 @@ Fake exporter 首次成功创建一个 sheet；同 export ID 重试不增加 she
 
 - [ ] **Step 7: 运行 E2E**
 
-Run: `npm --prefix frontend exec playwright test -- --config ../e2e/playwright.config.ts`
+Run: `npm --prefix frontend run test:e2e`
 
 Expected: 所有 Chromium 用例通过，失败时保留截图和 trace。
 
@@ -1347,7 +1347,7 @@ python -m ruff check backend
 npm --prefix frontend test -- --run
 npm --prefix frontend run typecheck
 npm --prefix frontend run build
-npm --prefix frontend exec playwright test -- --config ../e2e/playwright.config.ts
+npm --prefix frontend run test:e2e
 ```
 
 Expected: 全部退出码为 0；无网络时 Fake Adapter 流程完整可用。
