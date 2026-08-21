@@ -349,16 +349,47 @@ class Repository:
         self, project_id: str, requested_count: int, snapshot: Any, *, run_id: str | None = None
     ) -> dict[str, Any]:
         run_id = run_id or new_id()
-        self.connection.execute(
-            "INSERT INTO generation_runs(id,project_id,requested_count,configuration_snapshot_json) VALUES (?,?,?,?)",
-            (run_id, project_id, requested_count, _json(snapshot)),
-        )
-        self.connection.commit()
+        try:
+            self.connection.execute("BEGIN IMMEDIATE")
+            batch_number = self.connection.execute(
+                "SELECT COALESCE(MAX(batch_number),0)+1 FROM generation_runs WHERE project_id=?",
+                (project_id,),
+            ).fetchone()[0]
+            self.connection.execute(
+                "INSERT INTO generation_runs(id,project_id,requested_count,"
+                "configuration_snapshot_json,batch_number) VALUES (?,?,?,?,?)",
+                (run_id, project_id, requested_count, _json(snapshot), batch_number),
+            )
+            self.connection.commit()
+        except Exception:
+            self.connection.rollback()
+            raise
         return dict(
             self.connection.execute(
                 "SELECT * FROM generation_runs WHERE id=?", (run_id,)
             ).fetchone()
         )
+
+    def list_generation_runs(
+        self, project_id: str, *, include_archived: bool = False
+    ) -> list[dict[str, Any]]:
+        query = "SELECT * FROM generation_runs WHERE project_id=?"
+        if not include_archived:
+            query += " AND archived=0"
+        query += " ORDER BY batch_number DESC,created_at DESC"
+        return [dict(row) for row in self.connection.execute(query, (project_id,))]
+
+    def set_generation_run_archived(self, run_id: str, archived: bool) -> dict[str, Any]:
+        cursor = self.connection.execute(
+            "UPDATE generation_runs SET archived=?,"
+            "archived_at=CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE NULL END,"
+            "updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            (int(archived), int(archived), run_id),
+        )
+        self.connection.commit()
+        if cursor.rowcount != 1:
+            raise DomainError("RUN_NOT_FOUND", "Generation run not found", status_code=404)
+        return self.get_run(run_id)
 
     def get_run(self, run_id: str) -> dict[str, Any]:
         row = self.connection.execute(

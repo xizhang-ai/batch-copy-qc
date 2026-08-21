@@ -1,8 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { BoardPage } from "./BoardPage";
 
 it("always renders five columns and consistent AI processing count", async () => {
+  const user = userEvent.setup();
   render(<MemoryRouter initialEntries={["/projects/p-demo/board"]}><Routes><Route path="/projects/:id/board" element={<BoardPage />} /></Routes></MemoryRouter>);
   expect(await screen.findByRole("heading", { name: "待 AI QC" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "AI QC 中" })).toBeInTheDocument();
@@ -14,4 +16,32 @@ it("always renders five columns and consistent AI processing count", async () =>
   expect(screen.getByText("AI 自动通过")).toBeInTheDocument();
   expect(screen.getByText("人工通过")).toBeInTheDocument();
   expect(screen.getByText("强制通过 · 有遗留问题")).toBeInTheDocument();
+  const newBatchButton = await screen.findByRole("button", { name: "新建第 2 批" });
+  await user.click(newBatchButton);
+  const startDialog = screen.getByRole("dialog", { name: "按当前规则重新生成" });
+  expect(startDialog).toBeInTheDocument();
+  const confirmStart = screen.getByRole("button", { name: "确认生成第 2 批" });
+  const cancelStart = screen.getByRole("button", { name: "取消" });
+  await waitFor(() => expect(confirmStart).toHaveFocus());
+  await user.keyboard("{Shift>}{Tab}{/Shift}");
+  expect(cancelStart).toHaveFocus();
+  await user.keyboard("{Tab}");
+  expect(confirmStart).toHaveFocus();
+  await user.keyboard("{Escape}");
+  expect(screen.queryByRole("dialog", { name: "按当前规则重新生成" })).not.toBeInTheDocument();
+  expect(newBatchButton).toHaveFocus();
+
+  const hideButton = await screen.findByRole("button", { name: "隐藏本批" });
+  await user.click(hideButton);
+  expect(screen.getByRole("dialog", { name: "隐藏整批文案？" })).toHaveTextContent("这不是删除");
+  await user.keyboard("{Escape}");
+  expect(screen.queryByRole("dialog", { name: "隐藏整批文案？" })).not.toBeInTheDocument();
+  expect(hideButton).toHaveFocus();
+  await user.click(hideButton);
+  await user.click(screen.getByRole("button", { name: "确认隐藏本批" }));
+  const batchSelect = await screen.findByLabelText("生成批次");
+  await screen.findByRole("option", { name: "第 1 批 · 已隐藏" });
+  await user.selectOptions(batchSelect, "run-20260821-01");
+  expect(await screen.findByRole("button", { name: "恢复本批" })).toBeInTheDocument();
+  expect(await screen.findByText("这是已隐藏的第 1 批。")).toBeInTheDocument();
 });

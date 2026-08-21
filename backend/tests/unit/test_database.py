@@ -1,5 +1,6 @@
 import json
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 
 import pytest
@@ -51,6 +52,11 @@ def test_export_idempotency_migration_upgrades_existing_001_database(tmp_path):
         CREATE TABLE copy_types (
             id TEXT PRIMARY KEY
         );
+        CREATE TABLE generation_runs (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
         CREATE TABLE export_runs (
             id TEXT PRIMARY KEY,
             project_id TEXT NOT NULL,
@@ -89,6 +95,11 @@ def test_brief_review_migration_preserves_legacy_copy_type_rows(tmp_path):
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL
         );
+        CREATE TABLE generation_runs (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
         INSERT INTO copy_types(id, name) VALUES ('legacy-type', '旧类型');
         """
     )
@@ -103,6 +114,75 @@ def test_brief_review_migration_preserves_legacy_copy_type_rows(tmp_path):
     }
     versions = {row[0] for row in connection.execute("SELECT version FROM schema_migrations")}
     assert "003_copy_type_brief_review" in versions
+
+
+def test_generation_batch_migration_numbers_existing_runs_per_project(tmp_path):
+    connection = connect(tmp_path / "legacy-runs.sqlite3")
+    connection.executescript(
+        """
+        CREATE TABLE schema_migrations (
+            version TEXT PRIMARY KEY,
+            applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO schema_migrations(version) VALUES ('001_initial');
+        INSERT INTO schema_migrations(version) VALUES ('002_export_idempotency');
+        INSERT INTO schema_migrations(version) VALUES ('003_copy_type_brief_review');
+        CREATE TABLE generation_runs (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'queued',
+            requested_count INTEGER NOT NULL,
+            configuration_snapshot_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        INSERT INTO generation_runs VALUES
+          ('p1-r1','p1','completed',1,'{}','2026-08-21 09:00:00','2026-08-21 09:00:00'),
+          ('p1-r2','p1','completed',1,'{}','2026-08-21 09:00:00','2026-08-21 09:00:00'),
+          ('p2-r1','p2','completed',1,'{}','2026-08-21 08:00:00','2026-08-21 08:00:00');
+        """
+    )
+
+    migrate(connection)
+
+    rows = {
+        row["id"]: (row["batch_number"], row["archived"])
+        for row in connection.execute("SELECT * FROM generation_runs")
+    }
+    assert rows == {"p1-r1": (1, 0), "p1-r2": (2, 0), "p2-r1": (1, 0)}
+    assert "004_generation_run_batches" in {
+        row[0] for row in connection.execute("SELECT version FROM schema_migrations")
+    }
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            "INSERT INTO generation_runs(id,project_id,status,requested_count,"
+            "configuration_snapshot_json,created_at,updated_at,batch_number) "
+            "VALUES ('duplicate','p1','queued',1,'{}',CURRENT_TIMESTAMP,"
+            "CURRENT_TIMESTAMP,2)"
+        )
+
+
+def test_concurrent_generation_runs_receive_unique_sequential_batch_numbers(tmp_path):
+    database_path = tmp_path / "concurrent-runs.sqlite3"
+    connection = connect(database_path)
+    migrate(connection)
+    project = Repository(connection).create_project("并发批次")
+    connection.close()
+
+    def create_run(_ordinal: int) -> int:
+        thread_connection = connect(database_path, set_journal_mode=False)
+        try:
+            run = Repository(thread_connection).create_generation_run(
+                project["id"], 1, {}
+            )
+            return run["batch_number"]
+        finally:
+            thread_connection.close()
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        numbers = list(pool.map(create_run, range(6)))
+
+    assert sorted(numbers) == [1, 2, 3, 4, 5, 6]
 
 
 def test_duplicate_item_slot_is_rejected(tmp_path):

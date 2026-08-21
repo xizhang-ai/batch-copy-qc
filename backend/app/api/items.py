@@ -164,9 +164,16 @@ def board(
     completion_reason: str | None = None,
     repository: Repository = Depends(get_repository),
 ):
-    items = repository.list_items(project_id=project_id)
+    selected_run = None
     if run_id:
-        items = [item for item in items if item["run_id"] == run_id]
+        selected_run = repository.get_run(run_id)
+        if selected_run["project_id"] != project_id:
+            raise DomainError("RUN_NOT_FOUND", "Generation run not found", status_code=404)
+    else:
+        visible_runs = repository.list_generation_runs(project_id)
+        selected_run = visible_runs[0] if visible_runs else None
+    active_run_id = selected_run["id"] if selected_run else ""
+    items = repository.list_items(run_id=active_run_id) if active_run_id else []
     if copy_type_id:
         items = [item for item in items if item["copy_type_id"] == copy_type_id]
     if completion_reason:
@@ -196,14 +203,15 @@ def board(
         public["copy_type_name"] = type_names.get(item["copy_type_id"], "")
         public["findings"] = findings
         flat_items.append(public)
-    active_run_id = run_id or (items[-1]["run_id"] if items else "")
     run_status = "idle"
-    if active_run_id:
-        raw_status = repository.get_run(active_run_id)["status"]
+    if selected_run:
+        raw_status = selected_run["status"]
         run_status = "running" if raw_status in {"queued", "running"} else "completed"
     return {
         "project_id": project_id,
         "run_id": active_run_id,
+        "batch_number": selected_run["batch_number"] if selected_run else None,
+        "run_archived": bool(selected_run["archived"]) if selected_run else False,
         "run_status": run_status,
         "items": flat_items,
         "updated_at": max((item["updated_at"] for item in items), default=""),

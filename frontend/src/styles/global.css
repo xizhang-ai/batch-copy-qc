@@ -38,6 +38,11 @@ strong, .numeric { font-variant-numeric: tabular-nums; }
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-5); margin-bottom: var(--space-6); }
 .page-description { max-width: 58ch; margin: 0; color: var(--text-secondary); }
 .header-actions, .inline-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.batch-actions { align-items: end; }
+.batch-actions .field:first-child { min-width: 190px; }
+.batch-actions .field:nth-child(2) { min-width: 150px; }
+.batch-archive-notice { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-5); }
+.batch-dialog-kicker { margin-bottom: var(--space-2); color: var(--text-muted); font-size: 12px; line-height: 18px; font-weight: 600; }
 
 .button { position: relative; display: inline-flex; min-height: 40px; align-items: center; justify-content: center; gap: var(--space-2); padding: 9px 15px; border-radius: var(--radius-button); background: transparent; font-weight: 600; cursor: pointer; transition: transform var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard); }
 .button:active:not(:disabled) { transform: translateY(1px); }

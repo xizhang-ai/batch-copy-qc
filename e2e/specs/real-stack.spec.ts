@@ -42,9 +42,9 @@ test("真实前后端：项目 Brief 到 Fake AI QC 自动完成", async ({ page
 
   await expect(page.getByRole("heading", { name: "准备就绪" })).toBeVisible();
   await page.getByRole("link", { name: /开始生成/ }).click();
-  const dialog = page.getByRole("dialog", { name: "确认新生成批次" });
+  const dialog = page.getByRole("dialog", { name: "按当前规则重新生成" });
   await expect(dialog).toContainText("通勤场景实测 · 1 篇");
-  await dialog.getByRole("button", { name: "确认开始" }).click();
+  await dialog.getByRole("button", { name: /确认生成第 \d+ 批/ }).click();
 
   await expect(page.getByRole("heading", { name: "文案看板" })).toBeVisible();
   await expect(page.getByText("AI 自动通过", { exact: true })).toBeVisible({ timeout: 15_000 });

@@ -22,6 +22,25 @@ class ExportCreate(BaseModel):
     sheet_title: str = Field(default="小红书文案输出", min_length=1, max_length=100)
 
 
+def _resolve_generation_run(
+    repository: Repository, project_id: str, generation_run_id: str | None
+) -> str:
+    if generation_run_id:
+        run = repository.get_run(generation_run_id)
+        if run["project_id"] != project_id:
+            raise DomainError(
+                "RUN_NOT_FOUND", "Generation run not found", status_code=404
+            )
+        return generation_run_id
+    visible_runs = repository.list_generation_runs(project_id)
+    if not visible_runs:
+        raise DomainError(
+            "VISIBLE_GENERATION_RUN_REQUIRED",
+            "No visible generation batch is available for export",
+        )
+    return visible_runs[0]["id"]
+
+
 def _public_export(run: dict, adapter: str) -> dict:
     return {
         **run,
@@ -106,11 +125,14 @@ async def create_export(
 ):
     repository.get_project(project_id)
     export_id = payload.export_run_id or str(uuid4())
+    generation_run_id = _resolve_generation_run(
+        repository, project_id, payload.generation_run_id
+    )
     run = repository.create_export_run(
         export_id,
         project_id,
         payload.sheet_title,
-        payload.generation_run_id,
+        generation_run_id,
     )
     result = await _execute_export(request, repository, run)
     return _public_export(result, getattr(request.app.state.exporter, "adapter_name", "feishu"))

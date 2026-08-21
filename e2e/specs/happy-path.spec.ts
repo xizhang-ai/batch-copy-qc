@@ -29,8 +29,8 @@ test("从项目 Brief 配置到新生成批次", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "准备就绪" })).toBeVisible();
   await expect(page.getByText(/1 个帖子类型 · 计划生成/)).toContainText("2");
   await page.getByRole("link", { name: /开始生成/ }).click();
-  await expect(page.getByRole("dialog", { name: "确认新生成批次" })).toContainText("通勤场景 · 2 篇");
-  await page.getByRole("button", { name: "确认开始" }).click();
+  await expect(page.getByRole("dialog", { name: "按当前规则重新生成" })).toContainText("通勤场景 · 2 篇");
+  await page.getByRole("button", { name: /确认生成第 \d+ 批/ }).click();
   await expect(page.getByRole("heading", { name: "文案看板" })).toBeVisible();
 });
 

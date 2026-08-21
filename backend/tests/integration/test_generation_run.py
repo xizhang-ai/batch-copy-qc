@@ -45,6 +45,47 @@ def test_generation_creates_stable_slots_and_versions(client):
     assert run["generated"] == 2
 
 
+def test_batches_are_numbered_and_can_be_hidden_and_restored(client):
+    project, _copy_type = _configured_project(client)
+    first = client.post(f"/api/projects/{project['id']}/generation-runs", json={}).json()
+    _wait_run(client, first["id"])
+    second = client.post(f"/api/projects/{project['id']}/generation-runs", json={}).json()
+    _wait_run(client, second["id"])
+
+    runs = client.get(
+        f"/api/projects/{project['id']}/generation-runs?include_archived=true"
+    ).json()
+    assert [(run["batch_number"], run["label"]) for run in runs] == [
+        (2, "第 2 批"),
+        (1, "第 1 批"),
+    ]
+    current = client.get(f"/api/projects/{project['id']}/board").json()
+    assert current["run_id"] == second["id"]
+    assert current["batch_number"] == 2
+    assert len(current["items"]) == 1
+
+    hidden = client.patch(
+        f"/api/generation-runs/{second['id']}", json={"archived": True}
+    )
+    assert hidden.status_code == 200
+    assert hidden.json()["archived"] is True
+    fallback = client.get(f"/api/projects/{project['id']}/board").json()
+    assert fallback["run_id"] == first["id"]
+    assert fallback["batch_number"] == 1
+    explicitly_hidden = client.get(
+        f"/api/projects/{project['id']}/board?run_id={second['id']}"
+    ).json()
+    assert explicitly_hidden["run_id"] == second["id"]
+    assert explicitly_hidden["run_archived"] is True
+
+    restored = client.patch(
+        f"/api/generation-runs/{second['id']}", json={"archived": False}
+    )
+    assert restored.status_code == 200
+    assert restored.json()["archived"] is False
+    assert client.get(f"/api/projects/{project['id']}/board").json()["run_id"] == second["id"]
+
+
 def test_generation_validation_returns_all_issues(client):
     project = client.post("/api/projects", json={"name": "empty"}).json()
     response = client.post(f"/api/projects/{project['id']}/generation-runs", json={})

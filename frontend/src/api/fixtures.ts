@@ -79,6 +79,8 @@ export const fixtureRules: QcRule[] = [
 export const fixtureBoard: BoardData = {
   project_id: "p-demo",
   run_id: "run-20260821-01",
+  batch_number: 1,
+  run_archived: false,
   run_status: "running",
   updated_at: now,
   items: [

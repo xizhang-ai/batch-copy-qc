@@ -165,6 +165,8 @@ export type ItemResponse = Partial<CopyItem> & Pick<CopyItem, "id">;
 export interface BoardData {
   project_id: string;
   run_id: string;
+  batch_number?: number;
+  run_archived: boolean;
   run_status: "idle" | "running" | "completed";
   items: CopyItem[];
   updated_at: string;
@@ -175,6 +177,11 @@ export interface GenerationRun {
   project_id: string;
   status: "queued" | "pending" | "running" | "completed" | "partial_failed" | "failed";
   total_requested: number;
+  batch_number: number;
+  label: string;
+  archived: boolean;
+  archived_at?: string;
+  created_at: string;
 }
 
 export interface ConnectionStatus {
