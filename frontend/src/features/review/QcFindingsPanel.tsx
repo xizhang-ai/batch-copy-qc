@@ -4,11 +4,14 @@ import { findingKeywords } from "./findingKeywords";
 
 export function QcFindingsPanel({ findings, onLocate }: { findings: QcFinding[]; onLocate: (finding: QcFinding) => void }) {
   const legacyTagMessage = "Tags must start with # and contain no spaces";
-  const normalized = findings.map((finding) => finding.message === legacyTagMessage ? {
+  const normalized = findings.map((finding) => ({
     ...finding,
-    message: "话题标签格式需要检查",
-    suggestion: "标签文字中不要留空格；无需手动输入 #，界面会自动补充。",
-  } : finding);
+    field: finding.field ?? (finding.category === "tags" ? "tags" : undefined),
+    ...(finding.message === legacyTagMessage ? {
+      message: "话题标签格式需要检查",
+      suggestion: "标签文字中不要留空格；无需手动输入 #，界面会自动补充。",
+    } : {}),
+  }));
   const grouped = Array.from(normalized.reduce((groups, finding) => {
     const key = `${finding.level}|${finding.category}|${finding.message}`;
     const existing = groups.get(key);

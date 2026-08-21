@@ -93,3 +93,26 @@ it("shows a wrapping title field and locates a quoted keyword in the body", asyn
   expect(body.value.slice(body.selectionStart, body.selectionEnd)).toBe("全球前沿");
   expect(screen.getByRole("status")).toHaveTextContent("已定位正文中的关键词：“全球前沿”");
 });
+
+it("keeps tag findings in the tag field when the same keyword also appears in the body", async () => {
+  const user = userEvent.setup();
+  const item = structuredClone(fixtureBoard.items.find((entry) => entry.workflow_status === "human_review")!);
+  item.body = "正文先出现 Murad慕拉得，但这不是标签 QC 要定位的位置。";
+  item.tags = ["Murad慕拉得", "慕拉得面膜"];
+  item.findings = [{
+    ...item.findings[0],
+    id: "tag-format",
+    category: "tags",
+    message: "Tags must start with # and contain no spaces",
+    evidence: "Murad慕拉得",
+    field: undefined,
+  }];
+  render(<ReviewOverlay item={item} onClose={() => undefined} onItemChange={() => undefined} />);
+
+  await user.click(screen.getByRole("button", { name: "定位关键词" }));
+
+  const tags = screen.getByLabelText("话题标签") as HTMLInputElement;
+  expect(tags).toHaveFocus();
+  expect(tags.value.slice(tags.selectionStart ?? 0, tags.selectionEnd ?? 0)).toBe("Murad慕拉得");
+  expect(screen.getByRole("status")).toHaveTextContent("已定位话题标签中的关键词：“Murad慕拉得”");
+});

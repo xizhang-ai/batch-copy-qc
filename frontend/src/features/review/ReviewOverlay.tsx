@@ -56,7 +56,7 @@ export function ReviewOverlay({ item, returnFocus, onClose, onItemChange }: { it
       { field: "tags", label: "话题标签", ref: tagRef.current },
     ];
     const ordered = finding.field
-      ? [...targets.filter((target) => target.field === finding.field), ...targets.filter((target) => target.field !== finding.field)]
+      ? targets.filter((target) => target.field === finding.field)
       : targets;
     for (const keyword of locateCandidates(finding)) {
       for (const target of ordered) {
