@@ -64,3 +64,32 @@ it("merges a partial save response and refreshes fresh findings without closing 
   expect(screen.getByText(new RegExp(item.copy_type_name))).toBeInTheDocument();
   expect(onItemChange).toHaveBeenLastCalledWith(expect.objectContaining({ copy_type_name: item.copy_type_name, findings: [freshFinding], version: item.version + 1 }));
 });
+
+it("shows a wrapping title field and locates a quoted keyword in the body", async () => {
+  const user = userEvent.setup();
+  const item = structuredClone(fixtureBoard.items.find((entry) => entry.workflow_status === "human_review")!);
+  item.title = "一罐敷到面颈，15分钟把疲惫感按下暂停键";
+  item.body = "配方定位为全球前沿超修科技，帮助脆弱状态肌肤进行护理。";
+  item.findings = [{
+    ...item.findings[0],
+    id: "absolute-claim",
+    category: "claim",
+    message: "使用了带有全球领先暗示的绝对化表述。",
+    evidence: "“定位为全球前沿超修科技”",
+    suggestion: "避免使用“全球前沿”等暗示全球领先地位的表述。",
+    field: undefined,
+  }];
+  render(<ReviewOverlay item={item} onClose={() => undefined} onItemChange={() => undefined} />);
+
+  const title = screen.getByLabelText("标题");
+  expect(title.tagName).toBe("TEXTAREA");
+  expect(title).toHaveAttribute("rows", "2");
+  expect(screen.getByText("全球前沿")).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "定位关键词" }));
+
+  const body = screen.getByLabelText("正文") as HTMLTextAreaElement;
+  expect(body).toHaveFocus();
+  expect(body.value.slice(body.selectionStart, body.selectionEnd)).toBe("全球前沿");
+  expect(screen.getByRole("status")).toHaveTextContent("已定位正文中的关键词：“全球前沿”");
+});

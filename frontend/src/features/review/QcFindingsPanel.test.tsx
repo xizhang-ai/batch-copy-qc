@@ -20,5 +20,7 @@ it("explains and groups legacy tag findings without showing NaN confidence", () 
   expect(screen.getAllByText("话题标签格式需要检查")).toHaveLength(1);
   expect(screen.getByText("格式检查")).toBeInTheDocument();
   expect(screen.queryByText(/NaN/)).not.toBeInTheDocument();
-  expect(screen.getByText("Murad慕拉得、慕拉得面膜")).toBeInTheDocument();
+  expect(screen.getByText("Murad慕拉得")).toBeInTheDocument();
+  expect(screen.getByText("慕拉得面膜")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "定位关键词" })).toBeInTheDocument();
 });

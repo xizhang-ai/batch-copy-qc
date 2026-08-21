@@ -1,5 +1,6 @@
 import type { QcFinding } from "../../api/contracts";
 import { Icon } from "../../components/Icon";
+import { findingKeywords } from "./findingKeywords";
 
 export function QcFindingsPanel({ findings, onLocate }: { findings: QcFinding[]; onLocate: (finding: QcFinding) => void }) {
   const legacyTagMessage = "Tags must start with # and contain no spaces";
@@ -19,5 +20,8 @@ export function QcFindingsPanel({ findings, onLocate }: { findings: QcFinding[];
   const checkLabel = (finding: QcFinding) => Number.isFinite(finding.confidence)
     ? `置信 ${Math.round((finding.confidence ?? 0) * 100)}%`
     : finding.source === "model" ? "AI 检查" : finding.source === "system" ? "系统检查" : "格式检查";
-  return <div className="form-stack"><div><h2>QC 结果</h2><p className="page-description">证据来自当前版本，不确定项不会自动放行。</p></div>{grouped.length === 0 ? <div className="notice"><Icon name="check" /> 当前没有未解决问题。</div> : grouped.map((finding) => <article className={`finding-card ${finding.level}`} key={finding.id}><div className="rule-top"><span className={`status-chip ${finding.level === "hard" ? "danger" : "warning"}`}>{finding.level === "hard" ? "硬规则" : "软规则"} · {categoryLabel(finding.category)}</span><span className="meta">{checkLabel(finding)}</span></div><h3>{finding.message}</h3>{finding.evidence && <blockquote>{finding.evidence}</blockquote>}{finding.suggestion && <p>{finding.suggestion}</p>}<button className="button button-small button-secondary" onClick={() => onLocate(finding)}>定位证据</button></article>)}</div>;
+  return <div className="form-stack"><div><h2>QC 结果</h2><p className="page-description">先看命中关键词，再定位到当前版本中的原文。</p></div>{grouped.length === 0 ? <div className="notice"><Icon name="check" /> 当前没有未解决问题。</div> : grouped.map((finding) => {
+    const keywords = findingKeywords(finding);
+    return <article className={`finding-card ${finding.level}`} key={finding.id}><div className="rule-top"><span className={`status-chip ${finding.level === "hard" ? "danger" : "warning"}`}>{finding.level === "hard" ? "硬规则" : "软规则"} · {categoryLabel(finding.category)}</span><span className="meta">{checkLabel(finding)}</span></div><h3>{finding.message}</h3>{keywords.length > 0 && <div className="finding-keywords"><span className="field-label">命中关键词</span><div className="keyword-list">{keywords.map((keyword) => <mark key={keyword}>{keyword}</mark>)}</div></div>}{finding.evidence && <details className="finding-evidence"><summary>查看完整证据</summary><blockquote>{finding.evidence}</blockquote></details>}{finding.suggestion && <p>{finding.suggestion}</p>}<button className="button button-small button-secondary" onClick={() => onLocate(finding)}>定位关键词</button></article>;
+  })}</div>;
 }
