@@ -106,7 +106,10 @@ async def test_feishu_resolves_wiki_creates_sheet_and_overwrites_fixed_range() -
                     "data": {"node": {"obj_type": "sheet", "obj_token": "spreadsheet"}},
                 },
             )
-        if request.url.path.endswith("/sheets/batch_update"):
+        if request.url.path.endswith("/sheets_batch_update"):
+            assert request.url.path == (
+                "/open-apis/sheets/v2/spreadsheets/spreadsheet/sheets_batch_update"
+            )
             assert request.headers["authorization"] == "Bearer tenant-secret"
             return httpx.Response(
                 200,

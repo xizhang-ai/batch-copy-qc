@@ -94,7 +94,7 @@ class FeishuApiExporter:
         }
         data = await self._authorized_json(
             "POST",
-            f"/open-apis/sheets/v3/spreadsheets/{spreadsheet_token}/sheets/batch_update",
+            f"/open-apis/sheets/v2/spreadsheets/{spreadsheet_token}/sheets_batch_update",
             operation_code="FEISHU_SHEET_CREATE_FAILED",
             json=payload,
         )
