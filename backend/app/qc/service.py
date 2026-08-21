@@ -24,7 +24,7 @@ class QcService:
         repository: Repository,
         model_adapter: Any,
         *,
-        auto_rewrite_limit: int = 1,
+        auto_rewrite_limit: int = 4,
         retry_limit: int = 2,
         confidence_threshold: float = 0.7,
         similarity_threshold: int = 85,
@@ -106,10 +106,15 @@ class QcService:
         return [
             QcFinding(
                 "similarity",
-                f"Copy is too close to {match.source_kind} {match.matched_id}",
+                (
+                    f"与同批文案 {match.matched_id} 相似度过高"
+                    if match.source_kind == "batch_item"
+                    else f"与参考文案 {match.matched_id} 相似度过高"
+                ),
                 "hard",
                 f"score={match.score}",
-                auto_fixable=False,
+                suggestion="重写标题切入、段落结构和表达方式，同时保留已确认的项目事实。",
+                auto_fixable=True,
                 source="similarity",
                 matched_id=match.matched_id,
             )
@@ -175,8 +180,25 @@ class QcService:
             )
         )
         model_findings: list[QcFinding] = []
+        has_deterministic_similarity = any(
+            finding.category == "similarity" for finding in deterministic
+        )
+        duplicate_similarity_codes = {
+            "similarity",
+            "similarity_too_high",
+            "similarity_too_close",
+        }
         for finding in semantic.findings:
             matched_rule = self._matched_rule(finding, semantic_rules)
+            # Similarity is calculated deterministically with RapidFuzz. Drop only the
+            # model's exact, unlinked echo; a finding attached to a real rule is an
+            # independent policy violation and must never be hidden by deduplication.
+            if (
+                has_deterministic_similarity
+                and matched_rule is None
+                and finding.code.strip().lower() in duplicate_similarity_codes
+            ):
+                continue
             level = (
                 matched_rule.level
                 if matched_rule
@@ -279,9 +301,11 @@ class QcService:
             )
             self.repository.add_review_event(item_id, "ai_pass")
             return completed
-        requires_human = confidence < self.confidence_threshold or any(
-            finding.level == "hard" or not finding.auto_fixable for finding in findings
-        )
+        # A hard rule is non-overridable, but text findings can still be sent through
+        # up to auto_rewrite_limit constrained repair attempts. Model/system failures
+        # return earlier; low-confidence evaluations still require a person immediately.
+        # Persistent findings move to human review after auto_rewrite_limit is reached.
+        requires_human = confidence < self.confidence_threshold
         if requires_human or item["auto_rewrite_count"] >= self.auto_rewrite_limit:
             return self.repository.cas_item_state(item_id, "ai_qc_running", "human_review")
         rewriting = self.repository.cas_item_state(item_id, "ai_qc_running", "ai_rewrite_running")

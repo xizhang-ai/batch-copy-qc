@@ -390,7 +390,7 @@ CLIPROXY_QC_MODEL=
 CLIPROXY_REASONING_EFFORT=medium
 CLIPROXY_TIMEOUT_SECONDS=120
 MODEL_CONCURRENCY=2
-AUTO_REWRITE_LIMIT=1
+AUTO_REWRITE_LIMIT=4
 API_RETRY_LIMIT=2
 SIMILARITY_THRESHOLD=85
 QC_CONFIDENCE_THRESHOLD=0.70
@@ -817,7 +817,7 @@ async def test_retry_limit_moves_to_human_review(qc_service, exhausted_item):
 
 - [ ] **Step 2: 实现 QC 顺序**
 
-每次 QC 先运行确定性规则和批次相似度，再调用语义 QC。硬规则失败、模型低置信度或需要在两个 item 中选择时直接人工；仅所有问题均 `auto_fixable=true` 时进入自动改写。
+每次 QC 先运行确定性规则和批次相似度，再调用语义 QC。除模型低置信度或系统/模型异常外，所有内容类 finding 均先进入受 hard 规则约束的自动改写；hard 规则不可忽略或覆盖。初稿 v1 最多改写四次，v5 复检仍失败才进入人工审核。
 
 - [ ] **Step 3: 实现 AI 通过直达完成**
 
@@ -825,7 +825,7 @@ async def test_retry_limit_moves_to_human_review(qc_service, exhausted_item):
 
 - [ ] **Step 4: 实现自动改写限制**
 
-自动改写写入新版本、`auto_rewrite_count + 1`，然后回 `pending_ai_qc`。达到 `AUTO_REWRITE_LIMIT` 后停止调用模型并进入人工审核。
+自动改写写入新版本、`auto_rewrite_count + 1`，然后回 `pending_ai_qc`。`AUTO_REWRITE_LIMIT=4`，依次生成至 v5；v5 复检仍失败后停止调用模型并进入人工审核。
 
 - [ ] **Step 5: 处理 API 异常**
 

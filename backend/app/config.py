@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     cliproxy_api_mode: Literal["responses", "auto", "chat"] = "responses"
     cliproxy_timeout_seconds: float = 120
     model_concurrency: int = Field(2, ge=1, le=20)
-    auto_rewrite_limit: int = Field(1, ge=0, le=10)
+    auto_rewrite_limit: int = Field(4, ge=0, le=10)
     api_retry_limit: int = Field(2, ge=0, le=10)
     similarity_threshold: int = Field(85, ge=0, le=100)
     qc_confidence_threshold: float = Field(0.70, ge=0, le=1)

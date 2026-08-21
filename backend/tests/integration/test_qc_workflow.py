@@ -1,5 +1,9 @@
-from backend.app.domain.schemas import ModelQcFinding, SemanticQcResult
+import pytest
+
+from backend.app.domain.schemas import CopyDraft, ModelQcFinding, SemanticQcResult
+from backend.app.generation.service import GenerationService
 from backend.app.model.fake import FakeModelAdapter
+from backend.app.qc.service import QcService
 
 from .test_generation_run import _configured_project, _wait_run
 
@@ -32,8 +36,9 @@ def test_low_confidence_moves_to_human_review(client):
 
 
 class _HardRuleFindingModel(FakeModelAdapter):
-    def __init__(self, rule_id: str):
+    def __init__(self, rule_id: str, *, auto_fixable: bool = True):
         self.rule_id = rule_id
+        self.auto_fixable = auto_fixable
 
     async def run_semantic_qc(self, context):
         return SemanticQcResult(
@@ -42,7 +47,7 @@ class _HardRuleFindingModel(FakeModelAdapter):
                     code="CLAIM_RISK",
                     message="命中项目硬规则",
                     rule_id=self.rule_id,
-                    auto_fixable=True,
+                    auto_fixable=self.auto_fixable,
                 )
             ],
             confidence=0.95,
@@ -68,9 +73,181 @@ def test_model_finding_linked_to_hard_rule_stays_hard(client):
     item = client.get(f"/api/items/{settled['item_ids'][0]}").json()
 
     assert item["workflow_status"] == "human_review"
+    assert item["auto_rewrite_count"] == 4
+    assert item["current_version"] == 5
     assert any(
         finding["rule_id"] == rule["id"] and finding["level"] == "hard"
         for finding in item["findings"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_persistent_content_finding_reaches_human_review_only_at_v5(repository):
+    project = repository.create_project("demo")
+    repository.update_project(
+        project["id"], {"project_content_json": {"product": "气泡水"}, "confirmed": 1}
+    )
+    repository.create_copy_type(project["id"], name="通勤", quantity=1, brief_text="真实体验")
+    rule = repository.create_rule(
+        project["id"],
+        scope="project",
+        level="hard",
+        category="claim",
+        statement="不得作治疗宣称",
+    )
+    _run, items = GenerationService(repository).create_run(project["id"])
+    repository.append_version(
+        items[0]["id"], "测试标题", "测试正文", ["#测试"], "generation"
+    )
+    service = QcService(
+        repository,
+        _HardRuleFindingModel(rule["id"], auto_fixable=False),
+        auto_rewrite_limit=4,
+    )
+
+    rewritten = [await service.run(items[0]["id"]) for _ in range(4)]
+    reviewed = await service.run(items[0]["id"])
+
+    assert [item["current_version"] for item in rewritten] == [2, 3, 4, 5]
+    assert all(item["workflow_status"] == "pending_ai_qc" for item in rewritten)
+    assert reviewed["workflow_status"] == "human_review"
+    assert reviewed["current_version"] == 5
+    assert reviewed["auto_rewrite_count"] == 4
+
+
+class _SimilarityRewriteModel(FakeModelAdapter):
+    async def run_semantic_qc(self, context):
+        return SemanticQcResult(
+            findings=[
+                ModelQcFinding(
+                    code="SIMILARITY_TOO_HIGH",
+                    message="模型重复报告相似度问题",
+                    severity="error",
+                    auto_fixable=False,
+                )
+            ]
+            if context.similarity_context
+            else [],
+            confidence=0.95,
+        )
+
+    async def rewrite_copy(self, context):
+        return CopyDraft(
+            title="换一个完全不同的生活场景切入",
+            body="从周末出行前的准备说起，重新组织信息顺序与表达方式。",
+            tags=list(context.draft.tags),
+        )
+
+
+class _SimilarityAndIndependentHardModel(_SimilarityRewriteModel):
+    def __init__(self, rule_id: str):
+        self.rule_id = rule_id
+
+    async def run_semantic_qc(self, context):
+        return SemanticQcResult(
+            findings=[
+                ModelQcFinding(
+                    code="SIMILARITY_TOO_HIGH",
+                    message="模型重复报告相似度问题",
+                    severity="error",
+                    auto_fixable=False,
+                ),
+                ModelQcFinding(
+                    code="SIMILARITY_POLICY_VIOLATION",
+                    message="独立硬规则违规",
+                    severity="error",
+                    rule_id=self.rule_id,
+                    auto_fixable=False,
+                ),
+            ],
+            confidence=0.95,
+        )
+
+
+@pytest.mark.asyncio
+async def test_batch_similarity_is_auto_rewritten_before_human_review(repository):
+    project = repository.create_project("demo")
+    repository.update_project(
+        project["id"], {"project_content_json": {"product": "气泡水"}, "confirmed": 1}
+    )
+    repository.create_copy_type(
+        project["id"], name="通勤", quantity=2, brief_text="真实体验"
+    )
+    _run, items = GenerationService(repository).create_run(project["id"])
+    for item in items:
+        repository.append_version(
+            item["id"],
+            "完全相同的标题",
+            "完全相同的正文内容，用于触发批次相似度检查。",
+            ["#测试"],
+            "generation",
+        )
+    repository.cas_item_state(items[0]["id"], "pending_ai_qc", "ai_qc_running")
+    repository.cas_item_state(items[0]["id"], "ai_qc_running", "completed", "ai_pass")
+
+    service = QcService(
+        repository,
+        _SimilarityRewriteModel(),
+        auto_rewrite_limit=1,
+        similarity_threshold=85,
+    )
+    rewritten = await service.run(items[1]["id"])
+
+    assert rewritten["workflow_status"] == "pending_ai_qc"
+    assert rewritten["auto_rewrite_count"] == 1
+    assert rewritten["current_version"] == 2
+    assert rewritten["content"]["title"] == "换一个完全不同的生活场景切入"
+    assert len(
+        [
+            finding
+            for finding in repository.unresolved_findings(items[1]["id"])
+            if finding["category"] == "similarity"
+        ]
+    ) == 1
+
+    completed = await service.run(items[1]["id"])
+    assert completed["workflow_status"] == "completed"
+    assert completed["completion_reason"] == "ai_pass"
+
+
+@pytest.mark.asyncio
+async def test_similarity_dedup_never_hides_an_independent_hard_rule(repository):
+    project = repository.create_project("demo")
+    repository.update_project(
+        project["id"], {"project_content_json": {"product": "气泡水"}, "confirmed": 1}
+    )
+    repository.create_copy_type(project["id"], name="通勤", quantity=2, brief_text="真实体验")
+    rule = repository.create_rule(
+        project["id"],
+        scope="project",
+        level="hard",
+        category="policy",
+        statement="不得违反独立硬规则",
+    )
+    _run, items = GenerationService(repository).create_run(project["id"])
+    for item in items:
+        repository.append_version(
+            item["id"], "相同标题", "相同正文内容", ["#测试"], "generation"
+        )
+    repository.cas_item_state(items[0]["id"], "pending_ai_qc", "ai_qc_running")
+    repository.cas_item_state(items[0]["id"], "ai_qc_running", "completed", "ai_pass")
+
+    service = QcService(
+        repository,
+        _SimilarityAndIndependentHardModel(rule["id"]),
+        auto_rewrite_limit=0,
+        similarity_threshold=85,
+    )
+    result = await service.run(items[1]["id"])
+
+    assert result["workflow_status"] == "human_review"
+    unresolved = repository.unresolved_findings(items[1]["id"])
+    assert len([row for row in unresolved if row["category"] == "similarity"]) == 1
+    assert any(
+        row["rule_id"] == rule["id"]
+        and row["category"] == "SIMILARITY_POLICY_VIOLATION"
+        and row["level"] == "hard"
+        for row in unresolved
     )
 
 

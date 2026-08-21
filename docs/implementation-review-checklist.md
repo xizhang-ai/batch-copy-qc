@@ -83,8 +83,8 @@
 - [ ] **STATE-06 生成入口（P0）**：生成成功后只进入 `pending_ai_qc`，不会跳过 QC。
 - [ ] **STATE-07 AI QC 运行（P0）**：`pending_ai_qc → ai_qc_running` 原子执行，重复 worker/轮询不会并发运行同一 item。
 - [ ] **STATE-08 AI 直通（P0）**：全部 QC 通过时进入 `completed/ai_pass`，无需人工审核，并产生系统审核事件。
-- [ ] **STATE-09 自动改写循环（P0）**：仅全部问题可自动修复且未超限时进入 `ai_rewrite_running`；成功写新版本后回到 `pending_ai_qc` 并重新执行完整 QC。
-- [ ] **STATE-10 异常转人工（P0）**：硬规则冲突、事实不确定、参考相似度风险、低置信度、自动次数耗尽和 API 最终异常进入 `human_review`。
+- [ ] **STATE-09 自动改写循环（P0）**：除低置信度或系统/模型异常外，内容类问题在未超限时进入 `ai_rewrite_running`；成功写新版本后回到 `pending_ai_qc` 并重新执行完整 QC。
+- [ ] **STATE-10 异常转人工（P0）**：低置信度、自动次数耗尽和 API 最终异常进入 `human_review`；初稿 v1 未通过时最多自动改写四次，到 v5 复检仍未通过才转人工。
 - [ ] **STATE-11 直接编辑（P0）**：人工直接编辑生成新版本后仍为 `human_review`，不会自动完成。
 - [ ] **STATE-12 人工定向改写（P0）**：`human_review → ai_rewrite_running(origin=human) → human_review`；不得回 AI 自动直通路径。
 - [ ] **STATE-13 普通通过（P0）**：只有无未解决硬规则时可进入 `completed/human_pass`。
@@ -163,9 +163,9 @@
 - [ ] **QC-02 最小确定性规则（P0）**：检查标题/正文/标签非空、长度、must/avoid、必含词、禁用词、标签格式和可程序验证的产品事实 hard rule。
 - [ ] **QC-03 Finding 完整（P0）**：每项包含 rule_id、level、category、status/message、evidence、suggestion、auto_fixable 和 confidence；规则来源可追溯。
 - [ ] **QC-04 语义 QC 边界（P0）**：模型返回严格 schema 的 findings 和置信度；不直接修改文案、不决定强制通过。
-- [ ] **QC-05 自动修复资格（P0）**：只有全部未通过项都明确 `auto_fixable=true` 且不含 hard/事实/相似度决策时才自动改写。
+- [ ] **QC-05 自动修复资格（P0）**：内容类 finding（包括 hard、事实、相似度以及模型标记 `auto_fixable=false` 的项目）均先进行受 hard 规则约束的自动改写；低置信度与系统/模型异常除外。
 - [ ] **QC-06 低置信度（P0）**：低于 `QC_CONFIDENCE_THRESHOLD` 时不自动放行或自动猜测，进入人工审核。
-- [ ] **QC-07 自动次数（P0）**：达到 `AUTO_REWRITE_LIMIT` 后不再调用模型，进入人工审核；计数持久化并在 UI 显示。
+- [ ] **QC-07 自动次数（P0）**：`AUTO_REWRITE_LIMIT=4`；v1 最多依次生成 v2、v3、v4、v5，v5 复检仍失败后不再调用模型并进入人工审核；计数持久化并在 UI 显示。
 - [ ] **QC-08 API 失败保留内容（P0）**：模型错误不覆盖现有文案或 QC 记录；卡片保留并显示安全错误码，可按规则单条重试。
 
 ## 6. 生成、版本与审计链
