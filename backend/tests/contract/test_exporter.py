@@ -22,7 +22,7 @@ def make_rows() -> list[ExportRow]:
             copy_type="通勤场景",
             title="标题",
             body="正文",
-            tags=["#气泡水", "#通勤"],
+            tags=["气泡水", "#通勤"],
             completion_reason="ai_pass",
             legacy_issues=[],
             change_note="",

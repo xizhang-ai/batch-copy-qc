@@ -59,13 +59,18 @@ class ExportRow(_StrictModel):
             CompletionReason.HUMAN_PASS: "人工通过",
             CompletionReason.FORCED_PASS: "强制通过",
         }
+        display_tags = [
+            f"#{tag.strip().lstrip('#')}"
+            for tag in self.tags
+            if tag.strip().lstrip("#")
+        ]
         return [
             self.ordinal,
             self.item_id,
             self.copy_type,
             self.title,
             self.body,
-            " ".join(self.tags),
+            " ".join(display_tags),
             completion_labels[self.completion_reason],
             "；".join(self.legacy_issues),
             self.change_note,
