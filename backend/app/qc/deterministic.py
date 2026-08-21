@@ -53,12 +53,28 @@ def run_deterministic_qc(
             QcFinding("length", f"Body length must be {body_min}-{body_max}", evidence=body[:80])
         )
     if not tags:
-        findings.append(QcFinding("tags", "At least one topic tag is required"))
-    for tag in tags:
-        if not str(tag).startswith("#") or any(char.isspace() for char in str(tag)):
-            findings.append(
-                QcFinding("tags", "Tags must start with # and contain no spaces", evidence=str(tag))
+        findings.append(
+            QcFinding(
+                "tags",
+                "至少需要一个话题标签",
+                suggestion="输入标签文字即可，界面会自动显示 #。",
             )
+        )
+    invalid_tags = [
+        str(tag).strip().lstrip("#")
+        for tag in tags
+        if not str(tag).strip().lstrip("#")
+        or any(char.isspace() for char in str(tag).strip().lstrip("#"))
+    ]
+    if invalid_tags:
+        findings.append(
+            QcFinding(
+                "tags",
+                "话题标签不能包含空格",
+                evidence="、".join(invalid_tags),
+                suggestion="删除标签内部空格；无需手动输入 #，界面会自动补充。",
+            )
+        )
     for phrase in must_include or []:
         if phrase not in combined:
             findings.append(

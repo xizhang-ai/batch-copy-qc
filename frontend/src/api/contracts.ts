@@ -135,9 +135,10 @@ export interface QcFinding {
   message: string;
   evidence: string;
   suggestion: string;
-  field: "title" | "body" | "tags";
+  field?: "title" | "body" | "tags";
   auto_fixable: boolean;
-  confidence: number;
+  confidence?: number;
+  source?: "deterministic" | "model" | "system" | "similarity";
 }
 
 export interface CopyItem {
