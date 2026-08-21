@@ -439,6 +439,61 @@ class Repository:
         self.connection.commit()
         return self.get_item(item_id)
 
+    def append_auto_rewrite(
+        self,
+        item_id: str,
+        title: str,
+        body: str,
+        tags: list[str],
+        *,
+        expected_version: int,
+        expected_rewrite_count: int,
+        change_note: str = "AI QC auto-fix",
+    ) -> dict[str, Any]:
+        """Persist an automatic rewrite and its workflow counters atomically."""
+        try:
+            self.connection.execute("BEGIN IMMEDIATE")
+            item = self.connection.execute(
+                "SELECT current_version,auto_rewrite_count,workflow_status "
+                "FROM copy_items WHERE id=?",
+                (item_id,),
+            ).fetchone()
+            if not item:
+                raise DomainError("ITEM_NOT_FOUND", "Copy item not found", status_code=404)
+            if (
+                item["workflow_status"] != "ai_rewrite_running"
+                or item["current_version"] != expected_version
+                or item["auto_rewrite_count"] != expected_rewrite_count
+            ):
+                raise DomainError("ITEM_STATE_CONFLICT", "Item state changed", status_code=409)
+            version = expected_version + 1
+            self.connection.execute(
+                "INSERT INTO copy_item_versions(id,item_id,version,title,body,tags_json,origin,change_note) "
+                "VALUES (?,?,?,?,?,?,?,?)",
+                (new_id(), item_id, version, title, body, _json(tags), "auto", change_note),
+            )
+            cursor = self.connection.execute(
+                "UPDATE copy_items SET current_version=?,generation_status='generated',"
+                "workflow_status='pending_ai_qc',completion_reason=NULL,error_code=NULL,"
+                "auto_rewrite_count=?,updated_at=CURRENT_TIMESTAMP "
+                "WHERE id=? AND workflow_status='ai_rewrite_running' "
+                "AND current_version=? AND auto_rewrite_count=?",
+                (
+                    version,
+                    expected_rewrite_count + 1,
+                    item_id,
+                    expected_version,
+                    expected_rewrite_count,
+                ),
+            )
+            if cursor.rowcount != 1:
+                raise DomainError("ITEM_STATE_CONFLICT", "Item state changed", status_code=409)
+            self.connection.commit()
+        except Exception:
+            self.connection.rollback()
+            raise
+        return self.get_item(item_id)
+
     def cas_item_state(
         self,
         item_id: str,

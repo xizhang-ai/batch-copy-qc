@@ -39,14 +39,18 @@ class GenerationWorker:
             "WHERE workflow_status='ai_qc_running' AND generation_status<>'generated'"
         )
         self.repository.connection.execute(
+            "UPDATE copy_items SET workflow_status='pending_ai_qc',error_code=NULL "
+            "WHERE workflow_status='ai_rewrite_running' AND generation_status='generated'"
+        )
+        self.repository.connection.execute(
             "UPDATE copy_items SET workflow_status='human_review',"
             "error_code='WORKFLOW_RECOVERY_REQUIRED' "
-            "WHERE workflow_status='ai_rewrite_running'"
+            "WHERE workflow_status='ai_rewrite_running' AND generation_status<>'generated'"
         )
         self.repository.connection.commit()
         for row in self.repository.connection.execute(
-            "SELECT id FROM copy_items WHERE generation_status='queued' OR "
-            "(generation_status='generated' AND workflow_status='pending_ai_qc')"
+            "SELECT id FROM copy_items WHERE workflow_status='pending_ai_qc' "
+            "AND generation_status IN ('queued','generated')"
         ):
             await self.queue.put(row["id"])
         self.tasks = [asyncio.create_task(self._run()) for _ in range(self.concurrency)]
@@ -72,9 +76,10 @@ class GenerationWorker:
 
     async def process(self, item_id: str) -> None:
         item = self.repository.get_item(item_id)
+        if item["workflow_status"] != "pending_ai_qc":
+            return
         if item["generation_status"] == "generated":
-            if item["workflow_status"] == "pending_ai_qc":
-                await self._run_qc(item_id)
+            await self._run_qc(item_id)
             return
         self.repository.connection.execute(
             "UPDATE copy_items SET generation_status='running',error_code=NULL WHERE id=?",

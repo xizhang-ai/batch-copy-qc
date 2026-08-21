@@ -51,11 +51,11 @@
   → ai_qc_running
       ├─ 全部通过
       │    → completed / completion_reason=ai_pass
-      ├─ 可自动修复，且 auto_rewrite_count < AUTO_REWRITE_LIMIT
+      ├─ 内容 finding 仍未通过，且 auto_rewrite_count < AUTO_REWRITE_LIMIT
       │    → ai_rewrite_running
       │    → pending_ai_qc
-      └─ 硬规则冲突 / 事实不确定 / 相似度决策 / 低置信度 /
-          自动次数耗尽 / API 异常
+      └─ 低置信度 / 系统或模型异常 /
+          v5 复检仍未通过
            → human_review
 
 human_review

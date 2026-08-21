@@ -131,7 +131,13 @@ async def retry_qc(
     qc_service: QcService = Depends(get_request_qc_service),
 ):
     item = repository.get_item(item_id)
-    retryable = {"MODEL_RATE_LIMITED", "MODEL_TIMEOUT", "MODEL_UNAVAILABLE", "GENERATION_FAILED"}
+    retryable = {
+        "MODEL_RATE_LIMITED",
+        "MODEL_TIMEOUT",
+        "MODEL_UNAVAILABLE",
+        "MODEL_RESPONSE_INVALID",
+        "GENERATION_FAILED",
+    }
     if item["workflow_status"] != "human_review" or item["error_code"] not in retryable:
         raise DomainError(
             "ITEM_RETRY_NOT_ALLOWED",

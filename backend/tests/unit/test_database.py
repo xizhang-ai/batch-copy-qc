@@ -130,3 +130,48 @@ def test_completed_constraint_requires_reason(tmp_path):
         connection.execute(
             "UPDATE copy_items SET workflow_status='completed' WHERE id=?", (item["id"],)
         )
+
+
+def test_auto_rewrite_version_and_counter_roll_back_together(tmp_path):
+    connection = connect(tmp_path / "atomic-rewrite.sqlite3")
+    migrate(connection)
+    repository = Repository(connection)
+    project = repository.create_project("demo")
+    copy_type = repository.create_copy_type(project["id"], name="通勤", quantity=1)
+    run = repository.create_generation_run(project["id"], 1, {})
+    item = repository.create_item_slot(run["id"], copy_type["id"], 1)
+    repository.append_version(item["id"], "标题", "正文", ["#标签"], "generation")
+    repository.cas_item_state(item["id"], "pending_ai_qc", "ai_qc_running")
+    repository.cas_item_state(item["id"], "ai_qc_running", "ai_rewrite_running")
+    connection.executescript(
+        """
+        CREATE TRIGGER fail_auto_rewrite_transition
+        BEFORE UPDATE ON copy_items
+        WHEN OLD.workflow_status='ai_rewrite_running'
+          AND NEW.workflow_status='pending_ai_qc'
+        BEGIN
+          SELECT RAISE(ABORT, 'simulated crash window');
+        END;
+        """
+    )
+
+    with pytest.raises(sqlite3.IntegrityError):
+        repository.append_auto_rewrite(
+            item["id"],
+            "改写标题",
+            "改写正文",
+            ["#改写"],
+            expected_version=1,
+            expected_rewrite_count=0,
+        )
+
+    unchanged = repository.get_item(item["id"])
+    assert unchanged["workflow_status"] == "ai_rewrite_running"
+    assert unchanged["current_version"] == 1
+    assert unchanged["auto_rewrite_count"] == 0
+    assert (
+        connection.execute(
+            "SELECT COUNT(*) FROM copy_item_versions WHERE item_id=?", (item["id"],)
+        ).fetchone()[0]
+        == 1
+    )

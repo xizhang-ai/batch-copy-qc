@@ -1,5 +1,6 @@
 import pytest
 
+from backend.app.domain.errors import DomainError
 from backend.app.domain.schemas import CopyDraft, ModelQcFinding, SemanticQcResult
 from backend.app.generation.service import GenerationService
 from backend.app.model.fake import FakeModelAdapter
@@ -33,6 +34,92 @@ def test_low_confidence_moves_to_human_review(client):
     settled = _wait_run(client, run["id"])
     item = client.get(f"/api/items/{settled['item_ids'][0]}").json()
     assert item["workflow_status"] == "human_review"
+
+
+class _InvalidTwiceThenPassModel(FakeModelAdapter):
+    def __init__(self):
+        self.calls = 0
+
+    async def run_semantic_qc(self, context):
+        self.calls += 1
+        if self.calls < 3:
+            raise DomainError(
+                "MODEL_RESPONSE_INVALID",
+                "invalid structured response",
+                status_code=502,
+            )
+        return SemanticQcResult(findings=[], confidence=0.95)
+
+
+@pytest.mark.asyncio
+async def test_invalid_semantic_response_is_retried_before_human_review(repository):
+    project = repository.create_project("demo")
+    repository.update_project(
+        project["id"], {"project_content_json": {"product": "气泡水"}, "confirmed": 1}
+    )
+    repository.create_copy_type(project["id"], name="通勤", quantity=1, brief_text="真实体验")
+    _run, items = GenerationService(repository).create_run(project["id"])
+    repository.append_version(items[0]["id"], "测试标题", "测试正文", ["#测试"], "generation")
+    model = _InvalidTwiceThenPassModel()
+
+    result = await QcService(repository, model, retry_limit=2).run(items[0]["id"])
+
+    assert model.calls == 3
+    assert result["workflow_status"] == "completed"
+    assert result["completion_reason"] == "ai_pass"
+
+
+class _AlwaysInvalidModel(FakeModelAdapter):
+    def __init__(self):
+        self.calls = 0
+
+    async def run_semantic_qc(self, context):
+        self.calls += 1
+        raise DomainError(
+            "MODEL_RESPONSE_INVALID",
+            "invalid structured response",
+            status_code=502,
+        )
+
+
+@pytest.mark.asyncio
+async def test_exhausted_invalid_semantic_response_preserves_content(repository):
+    project = repository.create_project("demo")
+    repository.update_project(
+        project["id"], {"project_content_json": {"product": "气泡水"}, "confirmed": 1}
+    )
+    repository.create_copy_type(project["id"], name="通勤", quantity=1, brief_text="真实体验")
+    _run, items = GenerationService(repository).create_run(project["id"])
+    repository.append_version(items[0]["id"], "测试标题", "测试正文", ["#测试"], "generation")
+    model = _AlwaysInvalidModel()
+
+    result = await QcService(repository, model, retry_limit=1).run(items[0]["id"])
+
+    assert model.calls == 2
+    assert result["workflow_status"] == "human_review"
+    assert result["error_code"] == "MODEL_RESPONSE_INVALID"
+    assert result["current_version"] == 1
+    assert result["content"]["body"] == "测试正文"
+
+
+def test_invalid_model_response_can_be_retried_from_item_api(client):
+    project, _copy_type = _configured_project(client)
+    run = client.post(f"/api/projects/{project['id']}/generation-runs", json={}).json()
+    settled = _wait_run(client, run["id"])
+    item_id = settled["item_ids"][0]
+    repository = client.app.state.repository
+    repository.connection.execute(
+        "UPDATE copy_items SET workflow_status='human_review',completion_reason=NULL,"
+        "error_code='MODEL_RESPONSE_INVALID' WHERE id=?",
+        (item_id,),
+    )
+    repository.connection.commit()
+
+    retried = client.post(f"/api/items/{item_id}/qc:retry")
+
+    assert retried.status_code == 200
+    assert retried.json()["workflow_status"] == "completed"
+    assert retried.json()["completion_reason"] == "ai_pass"
 
 
 class _HardRuleFindingModel(FakeModelAdapter):

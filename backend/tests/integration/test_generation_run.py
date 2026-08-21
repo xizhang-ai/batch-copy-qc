@@ -225,6 +225,8 @@ async def test_worker_start_recovers_interrupted_qc_and_rewrite_states(tmp_path)
     run = repository.create_generation_run(project["id"], 2, {})
     qc_item = repository.create_item_slot(run["id"], copy_type["id"], 1)
     rewrite_item = repository.create_item_slot(run["id"], copy_type["id"], 2)
+    empty_qc_item = repository.create_item_slot(run["id"], copy_type["id"], 3)
+    empty_rewrite_item = repository.create_item_slot(run["id"], copy_type["id"], 4)
     for item in (qc_item, rewrite_item):
         repository.append_version(item["id"], "标题", "正文", ["#标签"], "generation")
     connection.execute(
@@ -233,6 +235,14 @@ async def test_worker_start_recovers_interrupted_qc_and_rewrite_states(tmp_path)
     connection.execute(
         "UPDATE copy_items SET workflow_status='ai_rewrite_running' WHERE id=?",
         (rewrite_item["id"],),
+    )
+    connection.execute(
+        "UPDATE copy_items SET workflow_status='ai_qc_running' WHERE id=?",
+        (empty_qc_item["id"],),
+    )
+    connection.execute(
+        "UPDATE copy_items SET workflow_status='ai_rewrite_running' WHERE id=?",
+        (empty_rewrite_item["id"],),
     )
     connection.commit()
     qc = _RecoveryQc(repository)
@@ -244,5 +254,11 @@ async def test_worker_start_recovers_interrupted_qc_and_rewrite_states(tmp_path)
 
     assert repository.get_item(qc_item["id"])["workflow_status"] == "completed"
     recovered_rewrite = repository.get_item(rewrite_item["id"])
-    assert recovered_rewrite["workflow_status"] == "human_review"
-    assert recovered_rewrite["error_code"] == "WORKFLOW_RECOVERY_REQUIRED"
+    assert recovered_rewrite["workflow_status"] == "completed"
+    assert recovered_rewrite["error_code"] is None
+    assert set(qc.calls) == {qc_item["id"], rewrite_item["id"]}
+    for empty_item in (empty_qc_item, empty_rewrite_item):
+        recovered_empty = repository.get_item(empty_item["id"])
+        assert recovered_empty["workflow_status"] == "human_review"
+        assert recovered_empty["error_code"] == "WORKFLOW_RECOVERY_REQUIRED"
+        assert recovered_empty["current_version"] == 0

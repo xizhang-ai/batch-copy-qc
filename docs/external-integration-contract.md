@@ -68,7 +68,7 @@ FEISHU_BASE_URL=https://open.feishu.cn
 - `MODEL_AUTH_FAILED`：不自动重试，连接状态标为异常。
 - `MODEL_RATE_LIMITED`：遵守 Retry-After，技术重试最多 2 次。
 - `MODEL_TIMEOUT`：技术重试最多 2 次。
-- `MODEL_RESPONSE_INVALID`：不覆盖现有内容；转人工或标记 Brief 解析失败。
+- `MODEL_RESPONSE_INVALID`：不覆盖现有内容；语义 QC 先按 `retry_limit` 自动重试，耗尽后转人工；Brief 解析失败则保留原文并显式报错。
 - `MODEL_UNAVAILABLE`：保留任务与数据，可单条重试。
 
 结构化返回必须经过 Pydantic 严格校验；供应商原始响应不得直接进入数据库业务 JSON。

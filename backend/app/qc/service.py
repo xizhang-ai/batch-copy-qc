@@ -44,7 +44,13 @@ class QcService:
             except DomainError as exc:
                 last_error = exc
                 if (
-                    exc.code not in {"MODEL_RATE_LIMITED", "MODEL_TIMEOUT", "MODEL_UNAVAILABLE"}
+                    exc.code
+                    not in {
+                        "MODEL_RATE_LIMITED",
+                        "MODEL_TIMEOUT",
+                        "MODEL_UNAVAILABLE",
+                        "MODEL_RESPONSE_INVALID",
+                    }
                     or attempt == self.retry_limit
                 ):
                     raise
@@ -331,17 +337,12 @@ class QcService:
                 ],
             )
         )
-        self.repository.append_version(
+        return self.repository.append_auto_rewrite(
             item_id,
             rewritten.title,
             rewritten.body,
             rewritten.tags,
-            "auto",
+            expected_version=item["current_version"],
+            expected_rewrite_count=rewriting["auto_rewrite_count"],
             change_note="AI QC auto-fix",
-        )
-        return self.repository.cas_item_state(
-            item_id,
-            "ai_rewrite_running",
-            "pending_ai_qc",
-            auto_rewrite_count=rewriting["auto_rewrite_count"] + 1,
         )
