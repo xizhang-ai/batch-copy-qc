@@ -4,6 +4,7 @@ from typing import Protocol, runtime_checkable
 
 from ..domain.enums import BriefScope
 from ..domain.schemas import (
+    AssistantPlan,
     BriefParseResult,
     CopyDraft,
     GenerationContext,
@@ -18,6 +19,13 @@ from ..domain.schemas import (
 
 @runtime_checkable
 class ModelAdapter(Protocol):
+    async def plan_project_setup(
+        self,
+        project: dict[str, object],
+        history: list[dict[str, str]],
+        user_message: str,
+    ) -> AssistantPlan: ...
+
     async def parse_brief(
         self,
         text: str,

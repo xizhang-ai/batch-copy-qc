@@ -346,8 +346,22 @@ class Repository:
             raise DomainError("QC_RULE_NOT_FOUND", "QC rule not found", status_code=404)
 
     def create_generation_run(
-        self, project_id: str, requested_count: int, snapshot: Any, *, run_id: str | None = None
+        self,
+        project_id: str,
+        requested_count: int,
+        snapshot: Any,
+        *,
+        run_id: str | None = None,
+        generation_mode: str = "full",
+        preview_item_count: int = 0,
     ) -> dict[str, Any]:
+        if generation_mode not in {"preview", "full"}:
+            raise DomainError("GENERATION_MODE_INVALID", "Generation mode is invalid", status_code=422)
+        if not 0 <= preview_item_count <= 3:
+            raise DomainError(
+                "PREVIEW_ITEM_COUNT_INVALID", "Preview item count must be between 0 and 3", status_code=422
+            )
+        phase = "preview_running" if generation_mode == "preview" else "full_running"
         run_id = run_id or new_id()
         try:
             self.connection.execute("BEGIN IMMEDIATE")
@@ -357,8 +371,18 @@ class Repository:
             ).fetchone()[0]
             self.connection.execute(
                 "INSERT INTO generation_runs(id,project_id,requested_count,"
-                "configuration_snapshot_json,batch_number) VALUES (?,?,?,?,?)",
-                (run_id, project_id, requested_count, _json(snapshot), batch_number),
+                "configuration_snapshot_json,batch_number,generation_mode,generation_phase,preview_item_count) "
+                "VALUES (?,?,?,?,?,?,?,?)",
+                (
+                    run_id,
+                    project_id,
+                    requested_count,
+                    _json(snapshot),
+                    batch_number,
+                    generation_mode,
+                    phase,
+                    preview_item_count,
+                ),
             )
             self.connection.commit()
         except Exception:
@@ -369,6 +393,63 @@ class Repository:
                 "SELECT * FROM generation_runs WHERE id=?", (run_id,)
             ).fetchone()
         )
+
+    def create_or_get_assistant_session(self, project_id: str) -> dict[str, Any]:
+        self.get_project(project_id)
+        existing = self.connection.execute(
+            "SELECT * FROM assistant_sessions WHERE project_id=?", (project_id,)
+        ).fetchone()
+        if existing:
+            return dict(existing)
+        session_id = new_id()
+        self.connection.execute(
+            "INSERT INTO assistant_sessions(id,project_id) VALUES (?,?)", (session_id, project_id)
+        )
+        self.connection.commit()
+        return dict(
+            self.connection.execute("SELECT * FROM assistant_sessions WHERE id=?", (session_id,)).fetchone()
+        )
+
+    def append_assistant_message(
+        self, session_id: str, role: str, content: str, *, plan: Any | None = None
+    ) -> dict[str, Any]:
+        if role not in {"user", "assistant", "system"}:
+            raise DomainError("ASSISTANT_MESSAGE_ROLE_INVALID", "Assistant message role is invalid", status_code=422)
+        message_id = new_id()
+        self.connection.execute(
+            "INSERT INTO assistant_messages(id,session_id,role,content,plan_json) VALUES (?,?,?,?,?)",
+            (message_id, session_id, role, content, _json(plan) if plan is not None else None),
+        )
+        self.connection.execute(
+            "UPDATE assistant_sessions SET updated_at=CURRENT_TIMESTAMP WHERE id=?", (session_id,)
+        )
+        self.connection.commit()
+        return self.list_assistant_messages(session_id)[-1]
+
+    def list_assistant_messages(self, session_id: str) -> list[dict[str, Any]]:
+        rows = self.connection.execute(
+            "SELECT * FROM assistant_messages WHERE session_id=? ORDER BY created_at,id", (session_id,)
+        )
+        return [
+            {**dict(row), "plan": json.loads(row["plan_json"]) if row["plan_json"] else None}
+            for row in rows
+        ]
+
+    def get_action_receipt(self, session_id: str, client_action_id: str) -> dict[str, Any] | None:
+        row = self.connection.execute(
+            "SELECT result_json FROM assistant_action_receipts WHERE session_id=? AND client_action_id=?",
+            (session_id, client_action_id),
+        ).fetchone()
+        return json.loads(row["result_json"]) if row else None
+
+    def save_action_receipt(
+        self, session_id: str, client_action_id: str, result: Any
+    ) -> None:
+        self.connection.execute(
+            "INSERT INTO assistant_action_receipts(id,session_id,client_action_id,result_json) VALUES (?,?,?,?)",
+            (new_id(), session_id, client_action_id, _json(result)),
+        )
+        self.connection.commit()
 
     def list_generation_runs(
         self, project_id: str, *, include_archived: bool = False

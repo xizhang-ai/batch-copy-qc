@@ -46,7 +46,7 @@
 - Modify: `frontend/src/api/contracts.ts`
 - Test: `backend/tests/unit/test_assistant_schemas.py`
 
-- [ ] **Step 1: Write failing schema tests**
+- [x] **Step 1: Write failing schema tests**
 
 ~~~python
 def test_unknown_assistant_action_is_rejected():
@@ -58,13 +58,13 @@ def test_empty_action_id_is_rejected():
         AssistantAction(client_action_id="", kind="set_project", payload={"name": "夏季种草"})
 ~~~
 
-- [ ] **Step 2: Run the tests**
+- [x] **Step 2: Run the tests**
 
 Run: `E:\xixiAi\batch-copy-qc\.venv\Scripts\python.exe -m pytest backend/tests/unit/test_assistant_schemas.py -q`
 
 Expected: FAIL because the schemas do not exist.
 
-- [ ] **Step 3: Add minimal shared models**
+- [x] **Step 3: Add minimal shared models**
 
 ~~~python
 class AssistantAction(StrictModel):
@@ -88,7 +88,7 @@ class PreviewConfirmation(StrictModel):
 
 Add matching TypeScript types plus `GenerationMode = "preview" | "full"` and preview fields on `GenerationRun`. Add `plan_project_setup(...)->AssistantPlan` to `ModelAdapter`.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `E:\xixiAi\batch-copy-qc\.venv\Scripts\python.exe -m pytest backend/tests/unit/test_assistant_schemas.py -q; npm.cmd --prefix frontend run typecheck`
 
@@ -105,7 +105,7 @@ Expected: PASS.
 - Modify: `backend/app/db/repositories.py`
 - Test: `backend/tests/integration/test_assistant_repository.py`
 
-- [ ] **Step 1: Write failing repository tests**
+- [x] **Step 1: Write failing repository tests**
 
 ~~~python
 def test_assistant_messages_are_saved_in_order(repository):
@@ -119,13 +119,13 @@ def test_preview_run_has_full_target_and_three_preview_slots(repository):
     assert (run["requested_count"], run["generation_phase"], run["preview_item_count"]) == (20, "preview_running", 3)
 ~~~
 
-- [ ] **Step 2: Run the tests**
+- [x] **Step 2: Run the tests**
 
 Run: `E:\xixiAi\batch-copy-qc\.venv\Scripts\python.exe -m pytest backend/tests/integration/test_assistant_repository.py -q`
 
 Expected: FAIL.
 
-- [ ] **Step 3: Add migration and repository methods**
+- [x] **Step 3: Add migration and repository methods**
 
 Migration requirements:
 
@@ -156,7 +156,7 @@ CREATE TABLE assistant_action_receipts (
 
 Implement `create_or_get_assistant_session`, `append_assistant_message`, `list_assistant_messages`, `get_action_receipt`, `save_action_receipt`, and transactional `create_item_slots(run_id, allocations)`. Slot insertion must retain the existing unique key and fail rather than duplicate.
 
-- [ ] **Step 4: Verify migrations and repositories**
+- [x] **Step 4: Verify migrations and repositories**
 
 Run: `E:\xixiAi\batch-copy-qc\.venv\Scripts\python.exe -m pytest backend/tests/integration/test_assistant_repository.py backend/tests -q`
 
@@ -401,4 +401,3 @@ Expected: all checks PASS.
 **Placeholder scan:** Every task has exact paths, concrete test examples, commands, expected results, implementation boundaries, and a commit.
 
 **Type consistency:** `AssistantPlan`, `AssistantAction`, `generation_mode`, `generation_phase`, `preview_item_count`, and `PreviewConfirmation.expected_preview_item_count` are defined once and used unchanged.
-

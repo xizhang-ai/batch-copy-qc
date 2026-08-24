@@ -11,6 +11,33 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class AssistantAction(StrictModel):
+    client_action_id: str = Field(min_length=1, max_length=100)
+    kind: Literal[
+        "set_project",
+        "replace_project_findings",
+        "upsert_copy_type",
+        "replace_project_rules",
+        "start_generation",
+    ]
+    payload: dict[str, Any]
+
+
+class AssistantPlan(StrictModel):
+    summary: str = Field(min_length=1, max_length=2000)
+    blockers: list[str] = Field(default_factory=list, max_length=3)
+    assumptions: list[str] = Field(default_factory=list, max_length=10)
+    actions: list[AssistantAction] = Field(default_factory=list, max_length=20)
+
+
+class AssistantMessageCreate(StrictModel):
+    content: str = Field(min_length=1, max_length=12000)
+
+
+class PreviewConfirmation(StrictModel):
+    expected_preview_item_count: int = Field(ge=1, le=3)
+
+
 class BriefFinding(StrictModel):
     value: str
     source_quote: str

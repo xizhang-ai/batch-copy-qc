@@ -5,6 +5,8 @@
 - 用户提出将项目改为对话驱动的简化入口，并认可默认先生成 3 篇预览。
 - 已检查现有生成 run、冻结快照、item slot、worker、前端三组看板和 API 结构。
 - 已创建实施计划 `docs/superpowers/plans/2026-08-24-conversational-preview-flow.md`；本轮仅写计划，未开始对话能力、预览批次或新页面的编码。
+- 已开始实施：新增 AssistantAction/AssistantPlan/PreviewConfirmation 严格 schema，扩展 ModelAdapter 任务规划方法，并在 Fake/CLIPROXY 适配器实现结构化计划输出；4 项单元测试及 Ruff 通过。
+- 已完成持久化基础：005 迁移增加 assistant sessions/messages/action receipts 与 preview run 字段；Repository 完成消息、幂等收据和 preview run 写入，相关迁移/数据库测试 11 项通过。
 
 ## 2026-08-21
 

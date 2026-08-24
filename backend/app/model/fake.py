@@ -8,6 +8,8 @@ from typing import Any
 from ..domain.enums import BriefScope
 from ..domain.errors import DomainError
 from ..domain.schemas import (
+    AssistantAction,
+    AssistantPlan,
     BriefFinding,
     BriefParseResult,
     BriefSections,
@@ -54,6 +56,40 @@ def _flatten_fact_values(value: Any) -> list[str]:
 
 class FakeModelAdapter:
     adapter_name = "fake"
+
+    async def plan_project_setup(
+        self,
+        project: dict[str, object],
+        history: list[dict[str, str]],
+        user_message: str,
+    ) -> AssistantPlan:
+        _fail_if_marked(user_message)
+        quantity_match = re.search(r"(?:生成|写|做)\s*(\d{1,3})\s*篇", user_message)
+        quantity = int(quantity_match.group(1)) if quantity_match else None
+        actions: list[AssistantAction] = []
+        if quantity:
+            actions.append(
+                AssistantAction(
+                    client_action_id="assistant-copy-type",
+                    kind="upsert_copy_type",
+                    payload={"name": "默认帖子类型", "quantity": quantity},
+                )
+            )
+        if user_message.strip():
+            actions.append(
+                AssistantAction(
+                    client_action_id="assistant-project",
+                    kind="set_project",
+                    payload={"name": str(project.get("name") or "新种草任务")},
+                )
+            )
+        blockers = [] if quantity else ["请告诉我希望生成多少篇文案。"]
+        return AssistantPlan(
+            summary=f"我会按你的描述整理任务{f'，先准备 {quantity} 篇文案' if quantity else ''}。",
+            blockers=blockers,
+            assumptions=["未明确的产品事实会在生成前继续向你确认。"],
+            actions=actions,
+        )
 
     async def parse_brief(
         self,
