@@ -8,6 +8,9 @@
 - 已开始实施：新增 AssistantAction/AssistantPlan/PreviewConfirmation 严格 schema，扩展 ModelAdapter 任务规划方法，并在 Fake/CLIPROXY 适配器实现结构化计划输出；4 项单元测试及 Ruff 通过。
 - 已完成持久化基础：005 迁移增加 assistant sessions/messages/action receipts 与 preview run 字段；Repository 完成消息、幂等收据和 preview run 写入，相关迁移/数据库测试 11 项通过。
 - 已完成后端交互主链路：新增 assistant session/message/action API，提案与落库操作分离且 action receipt 可幂等重放；preview run 按类型轮询创建最多 3 个槽位，处理结束暂停，确认后在同一 run 中追加剩余槽位。13 项接口/生成回归测试与 Ruff 通过。
+- 已完成工作台界面与路由切换：新建项目和项目列表均进入“任务工作台”；左侧对话生成可应用的任务提案，右侧展示当前任务、3 篇预览与同批次继续生成，保留高级配置和完整看板入口。Mock 与真实 API 均覆盖会话和 preview continuation。
+- 修复工作台初始加载与操作回写的竞态，并让同一预览确认在生成完成后仍幂等成功；同秒写入的会话消息按 SQLite 插入顺序稳定返回。
+- 最终验证：后端 `pytest backend/tests -q` 124 passed、Ruff 通过；前端 TypeScript、13 个测试文件/23 项测试与 production build 均通过。
 
 ## 2026-08-21
 

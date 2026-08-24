@@ -424,11 +424,12 @@ class Repository:
             "UPDATE assistant_sessions SET updated_at=CURRENT_TIMESTAMP WHERE id=?", (session_id,)
         )
         self.connection.commit()
-        return self.list_assistant_messages(session_id)[-1]
+        row = self.connection.execute("SELECT * FROM assistant_messages WHERE id=?", (message_id,)).fetchone()
+        return {**dict(row), "plan": json.loads(row["plan_json"]) if row["plan_json"] else None}
 
     def list_assistant_messages(self, session_id: str) -> list[dict[str, Any]]:
         rows = self.connection.execute(
-            "SELECT * FROM assistant_messages WHERE session_id=? ORDER BY created_at,id", (session_id,)
+            "SELECT * FROM assistant_messages WHERE session_id=? ORDER BY rowid", (session_id,)
         )
         return [
             {**dict(row), "plan": json.loads(row["plan_json"]) if row["plan_json"] else None}
@@ -509,7 +510,7 @@ class Repository:
                 raise DomainError("PREVIEW_CONFIRMATION_INVALID", "Run is not a preview", status_code=409)
             if run["preview_item_count"] != expected_preview_item_count:
                 raise DomainError("PREVIEW_ITEM_COUNT_MISMATCH", "Preview item count changed", status_code=409)
-            if run["generation_phase"] == "full_running":
+            if run["generation_phase"] in {"full_running", "completed"}:
                 self.connection.commit()
                 return []
             if run["generation_phase"] != "awaiting_preview_approval":

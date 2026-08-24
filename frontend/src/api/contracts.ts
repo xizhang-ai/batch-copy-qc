@@ -11,6 +11,8 @@ export type BriefSection = "project_content" | "copy_requirements" | "qc_require
 export type RuleLevel = "hard" | "soft" | "pending";
 export type RuleScope = "project" | "type";
 export type ExportStatus = "pending" | "running" | "succeeded" | "failed";
+export type GenerationMode = "preview" | "full";
+export type GenerationPhase = "preview_running" | "awaiting_preview_approval" | "full_running" | "completed";
 
 export interface Project {
   id: string;
@@ -182,6 +184,36 @@ export interface GenerationRun {
   archived: boolean;
   archived_at?: string;
   created_at: string;
+  generation_mode?: GenerationMode;
+  generation_phase?: GenerationPhase;
+  preview_item_count?: number;
+}
+
+export interface AssistantAction {
+  client_action_id: string;
+  kind: "set_project" | "replace_project_findings" | "upsert_copy_type" | "replace_project_rules" | "start_generation";
+  payload: Record<string, unknown>;
+}
+
+export interface AssistantPlan {
+  summary: string;
+  blockers: string[];
+  assumptions: string[];
+  actions: AssistantAction[];
+}
+
+export interface AssistantMessage {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  plan?: AssistantPlan | null;
+  created_at: string;
+}
+
+export interface AssistantSession {
+  id: string;
+  project_id: string;
+  messages: AssistantMessage[];
 }
 
 export interface ConnectionStatus {

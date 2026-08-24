@@ -8,7 +8,7 @@ export function NewProjectPage() {
   const [form, setForm] = useState({ name: "", brand: "", category: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const submit = async (event: React.FormEvent) => { event.preventDefault(); setSaving(true); setError(""); try { const project = await api.createProject(form); navigate(`/projects/${project.id}/content`); } catch (err) { setError((err as Error).message); } finally { setSaving(false); } };
+  const submit = async (event: React.FormEvent) => { event.preventDefault(); setSaving(true); setError(""); try { const project = await api.createProject(form); navigate(`/projects/${project.id}`); } catch (err) { setError((err as Error).message); } finally { setSaving(false); } };
   return <div className="page"><div className="page-header"><div><h1>建立项目</h1><p className="page-description">先给项目一个清楚的名字。品牌和品类可以留空，稍后从 Brief 中补充。</p></div></div>
     {error && <ErrorNotice message={error} />}
     <form className="panel section-panel form-stack" style={{ maxWidth: 720 }} onSubmit={submit}>

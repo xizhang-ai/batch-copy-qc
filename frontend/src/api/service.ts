@@ -1,5 +1,5 @@
 import { apiRequest } from "./client";
-import type { BoardData, ClassifiedTypeFile, ConnectionStatus, CopyItem, CopyType, ExportPreview, ExportRun, GenerationRun, ItemResponse, ParsedBrief, ParsedTypeBrief, Project, QcRule, ReviewPayload, RewriteSelectionPayload } from "./contracts";
+import type { AssistantAction, AssistantMessage, AssistantPlan, AssistantSession, BoardData, ClassifiedTypeFile, ConnectionStatus, CopyItem, CopyType, ExportPreview, ExportRun, GenerationMode, GenerationRun, ItemResponse, ParsedBrief, ParsedTypeBrief, Project, QcRule, ReviewPayload, RewriteSelectionPayload } from "./contracts";
 
 const isMock = () => __USE_MOCK_API__;
 const mock = async () => (await import("./mockService")).mockApi;
@@ -34,7 +34,11 @@ export const api = {
   async deleteRule(ruleId: string): Promise<void> { if (isMock()) return (await mock()).deleteRule(ruleId); await apiRequest(`/api/qc-rules/${ruleId}`, { method: "DELETE" }); },
   async getBoard(projectId: string, runId?: string): Promise<BoardData> { const query = runId ? `?run_id=${encodeURIComponent(runId)}` : ""; return isMock() ? (await mock()).getBoard(projectId, runId) : apiRequest(`/api/projects/${projectId}/board${query}`); },
   async listGenerationRuns(projectId: string): Promise<GenerationRun[]> { return isMock() ? (await mock()).listGenerationRuns(projectId) : apiRequest(`/api/projects/${projectId}/generation-runs?include_archived=true`); },
-  async createGenerationRun(projectId: string): Promise<GenerationRun> { return isMock() ? (await mock()).createGenerationRun(projectId) : apiRequest(`/api/projects/${projectId}/generation-runs`, { method: "POST", body: JSON.stringify({}) }); },
+  async createGenerationRun(projectId: string, generationMode: GenerationMode = "full"): Promise<GenerationRun> { return isMock() ? (await mock()).createGenerationRun(projectId, generationMode) : apiRequest(`/api/projects/${projectId}/generation-runs`, { method: "POST", body: JSON.stringify({ generation_mode: generationMode }) }); },
+  async confirmPreview(runId: string, expectedPreviewItemCount: number): Promise<GenerationRun> { return isMock() ? (await mock()).confirmPreview(runId, expectedPreviewItemCount) : apiRequest(`/api/generation-runs/${runId}/preview:confirm`, { method: "POST", body: JSON.stringify({ expected_preview_item_count: expectedPreviewItemCount }) }); },
+  async getAssistantSession(projectId: string): Promise<AssistantSession> { return isMock() ? (await mock()).getAssistantSession(projectId) : apiRequest(`/api/projects/${projectId}/assistant/session`); },
+  async sendAssistantMessage(projectId: string, content: string): Promise<{ session_id: string; message: AssistantMessage; plan: AssistantPlan }> { return isMock() ? (await mock()).sendAssistantMessage(projectId, content) : apiRequest(`/api/projects/${projectId}/assistant/messages`, { method: "POST", body: JSON.stringify({ content }) }); },
+  async applyAssistantActions(projectId: string, actions: AssistantAction[]): Promise<{ results: Array<Record<string, unknown>> }> { return isMock() ? (await mock()).applyAssistantActions(projectId, actions) : apiRequest(`/api/projects/${projectId}/assistant/actions:apply`, { method: "POST", body: JSON.stringify({ actions }) }); },
   async setGenerationRunArchived(runId: string, archived: boolean): Promise<GenerationRun> { return isMock() ? (await mock()).setGenerationRunArchived(runId, archived) : apiRequest(`/api/generation-runs/${runId}`, { method: "PATCH", body: JSON.stringify({ archived }) }); },
   async retryQc(itemId: string): Promise<CopyItem> { return isMock() ? (await mock()).retryQc(itemId) : apiRequest(`/api/items/${itemId}/qc:retry`, { method: "POST" }); },
   async getItem(itemId: string): Promise<ItemResponse> { return isMock() ? (await mock()).getItem(itemId) : apiRequest(`/api/items/${itemId}`); },

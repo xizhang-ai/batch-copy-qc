@@ -218,6 +218,13 @@ class GenerationService:
             status = "failed"
         else:
             status = "completed"
+        if not pending and run["generation_phase"] == "full_running":
+            self.repository.connection.execute(
+                "UPDATE generation_runs SET generation_phase='completed',updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                (run_id,),
+            )
+            self.repository.connection.commit()
+            run["generation_phase"] = "completed"
         if run["status"] != status:
             self.repository.connection.execute(
                 "UPDATE generation_runs SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",

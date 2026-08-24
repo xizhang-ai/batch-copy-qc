@@ -21,7 +21,7 @@ export function ProjectListPage() {
         <div className="chip-row"><span className={`status-chip ${project.status === "confirmed" ? "success" : "warning"}`}>{project.status === "confirmed" ? "项目内容已确认" : "待完成配置"}</span></div>
         <h2 style={{ marginTop: 20 }}>{project.name}</h2>
         <p className="page-description">{project.brand || "品牌未填写"} · {project.category || "品类未填写"}</p>
-        <div className="card-footer"><span className="meta">更新于 {new Date(project.updated_at).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span><Link className="button button-secondary" to={`/projects/${project.id}/content`}>进入项目<Icon name="arrow" /></Link></div>
+        <div className="card-footer"><span className="meta">更新于 {new Date(project.updated_at).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span><Link className="button button-secondary" to={`/projects/${project.id}`}>进入项目<Icon name="arrow" /></Link></div>
       </article>)}</div>}
   </div>;
 }
