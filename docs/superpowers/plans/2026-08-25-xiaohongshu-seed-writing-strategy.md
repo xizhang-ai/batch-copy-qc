@@ -106,7 +106,7 @@ Run: `.venv\\Scripts\\python.exe -m pytest backend/tests -q; .venv\\Scripts\\pyt
 
 Expected: all tests pass and Ruff reports no errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend docs/superpowers/plans/2026-08-25-xiaohongshu-seed-writing-strategy.md task_plan.md progress.md
