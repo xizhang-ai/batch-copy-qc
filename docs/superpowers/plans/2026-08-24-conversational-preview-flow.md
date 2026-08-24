@@ -177,7 +177,7 @@ Expected: PASS.
 - Modify: `backend/app/main.py`
 - Test: `backend/tests/contract/test_assistant_api.py`
 
-- [ ] **Step 1: Write failing contract tests**
+- [x] **Step 1: Write failing contract tests**
 
 ~~~python
 def test_message_returns_a_plan_without_mutating_the_project(client, project):
@@ -192,13 +192,13 @@ def test_action_application_is_idempotent(client, project):
     assert client.post(f"/api/projects/{project['id']}/assistant/actions:apply", json=payload).status_code == 200
 ~~~
 
-- [ ] **Step 2: Run focused tests**
+- [x] **Step 2: Run focused tests**
 
 Run: `E:\xixiAi\batch-copy-qc\.venv\Scripts\python.exe -m pytest backend/tests/contract/test_assistant_api.py -q`
 
 Expected: FAIL with route-not-found.
 
-- [ ] **Step 3: Implement service and routes**
+- [x] **Step 3: Implement service and routes**
 
 Expose:
 
@@ -210,7 +210,7 @@ POST /api/projects/{project_id}/assistant/actions:apply
 
 `AssistantService.reply` appends the user message, calls `plan_project_setup`, and persists the assistant plan. `apply_actions` validates all actions before changing anything, uses existing project/copy-type/rule/generation services, and stores an action receipt. If a plan has blockers, `start_generation` returns `ASSISTANT_BLOCKERS_UNRESOLVED` (409). Fake mode returns deterministic plans; CLIPROXY uses strict Responses structured output.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `E:\xixiAi\batch-copy-qc\.venv\Scripts\python.exe -m pytest backend/tests/contract/test_assistant_api.py backend/tests/contract -q`
 
@@ -230,7 +230,7 @@ Expected: PASS; posting a message alone changes no project data.
 - Test: `backend/tests/integration/test_preview_generation.py`
 - Test: `backend/tests/contract/test_runs_api.py`
 
-- [ ] **Step 1: Write failing lifecycle tests**
+- [x] **Step 1: Write failing lifecycle tests**
 
 ~~~python
 def test_preview_creates_three_representative_slots_then_pauses(client, configured_project):
@@ -247,13 +247,13 @@ def test_confirm_preview_appends_to_the_original_run(client, configured_project)
     assert response.json()["generation_phase"] == "full_running"
 ~~~
 
-- [ ] **Step 2: Run focused tests**
+- [x] **Step 2: Run focused tests**
 
 Run: `E:\xixiAi\batch-copy-qc\.venv\Scripts\python.exe -m pytest backend/tests/integration/test_preview_generation.py backend/tests/contract/test_runs_api.py -q`
 
 Expected: FAIL.
 
-- [ ] **Step 3: Implement allocation and phase transition**
+- [x] **Step 3: Implement allocation and phase transition**
 
 Extend `RunCreate` with `generation_mode: Literal["preview", "full"] = "preview"`. Preserve `requested_count` as the configured total. Create only selected preview slots when in preview mode. In `summary`, set `awaiting_preview_approval` only after every preview item has terminal generation status; the worker must not enqueue additional items.
 
@@ -261,7 +261,7 @@ Add `GenerationService.confirm_preview(run_id, expected_preview_item_count)`. Wi
 
 Add `POST /api/generation-runs/{run_id}/preview:confirm`; include mode, phase, preview count, generated and pending counts in public run responses.
 
-- [ ] **Step 4: Verify generation regressions**
+- [x] **Step 4: Verify generation regressions**
 
 Run: `E:\xixiAi\batch-copy-qc\.venv\Scripts\python.exe -m pytest backend/tests/integration/test_preview_generation.py backend/tests/integration/test_qc_workflow.py backend/tests -q`
 

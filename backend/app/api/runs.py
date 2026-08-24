@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, ConfigDict
 
 from ..db.repositories import Repository
+from ..domain.schemas import PreviewConfirmation
 from ..generation.service import GenerationService
 from .dependencies import get_repository
 
@@ -13,6 +16,7 @@ router = APIRouter(tags=["generation-runs"])
 class RunCreate(BaseModel):
     model_config = ConfigDict(extra="ignore")
     run_id: str | None = None
+    generation_mode: Literal["preview", "full"] = "full"
 
 
 class RunUpdate(BaseModel):
@@ -26,6 +30,9 @@ def _public_run(run: dict):
         "total_requested": run.get("total_requested", run.get("requested_count", 0)),
         "label": f"第 {run['batch_number']} 批",
         "archived": bool(run["archived"]),
+        "generation_mode": run.get("generation_mode", "full"),
+        "generation_phase": run.get("generation_phase", "full_running"),
+        "preview_item_count": run.get("preview_item_count", 0),
     }
 
 
@@ -37,7 +44,25 @@ async def create_run(
     repository: Repository = Depends(get_repository),
 ):
     run, items = GenerationService(repository).create_run(
-        project_id, run_id=payload.run_id if payload else None
+        project_id,
+        run_id=payload.run_id if payload else None,
+        generation_mode=payload.generation_mode if payload else "full",
+    )
+    worker = request.app.state.generation_worker
+    for item in items:
+        await worker.enqueue(item["id"])
+    return _public_run(GenerationService(repository).summary(run["id"]))
+
+
+@router.post("/api/generation-runs/{run_id}/preview:confirm")
+async def confirm_preview(
+    run_id: str,
+    payload: PreviewConfirmation,
+    request: Request,
+    repository: Repository = Depends(get_repository),
+):
+    run, items = GenerationService(repository).confirm_preview(
+        run_id, payload.expected_preview_item_count
     )
     worker = request.app.state.generation_worker
     for item in items:

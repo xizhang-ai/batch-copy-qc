@@ -125,8 +125,18 @@ class GenerationService:
                 )
         return issues
 
+    @staticmethod
+    def _slot_allocations(copy_types: list[dict[str, Any]]) -> list[tuple[str, int]]:
+        maximum = max((int(copy_type["quantity"]) for copy_type in copy_types), default=0)
+        return [
+            (copy_type["id"], ordinal)
+            for ordinal in range(1, maximum + 1)
+            for copy_type in copy_types
+            if int(copy_type["quantity"]) >= ordinal
+        ]
+
     def create_run(
-        self, project_id: str, *, run_id: str | None = None
+        self, project_id: str, *, run_id: str | None = None, generation_mode: str = "full"
     ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         issues = self.validate(project_id)
         if issues:
@@ -157,15 +167,32 @@ class GenerationService:
             )
         snapshot = {"project": project, "copy_types": snapshot_types, "rules": rules}
         requested = sum(copy_type["quantity"] for copy_type in types)
+        allocations = self._slot_allocations(types)
+        preview_item_count = min(3, len(allocations)) if generation_mode == "preview" else 0
         run = self.repository.create_generation_run(
-            project_id, requested, snapshot, run_id=run_id or str(uuid4())
+            project_id,
+            requested,
+            snapshot,
+            run_id=run_id or str(uuid4()),
+            generation_mode=generation_mode,
+            preview_item_count=preview_item_count,
         )
         items = [
-            self.repository.create_item_slot(run["id"], copy_type["id"], ordinal)
-            for copy_type in types
-            for ordinal in range(1, copy_type["quantity"] + 1)
+            self.repository.create_item_slot(run["id"], copy_type_id, ordinal)
+            for copy_type_id, ordinal in allocations[:preview_item_count or len(allocations)]
         ]
         return run, items
+
+    def confirm_preview(
+        self, run_id: str, expected_preview_item_count: int
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        run = self.repository.get_run(run_id)
+        snapshot = json.loads(run["configuration_snapshot_json"])
+        allocations = self._slot_allocations(snapshot["copy_types"])
+        items = self.repository.append_preview_slots(
+            run_id, expected_preview_item_count, allocations
+        )
+        return self.repository.get_run(run_id), items
 
     def summary(self, run_id: str) -> dict[str, Any]:
         run = self.repository.get_run(run_id)
@@ -175,7 +202,15 @@ class GenerationService:
             for status in ("queued", "running", "generated", "failed")
         }
         pending = counts["queued"] + counts["running"]
-        if pending:
+        if run["generation_mode"] == "preview" and run["generation_phase"] == "preview_running" and not pending:
+            self.repository.connection.execute(
+                "UPDATE generation_runs SET generation_phase='awaiting_preview_approval',status='completed',updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                (run_id,),
+            )
+            self.repository.connection.commit()
+            run["generation_phase"] = "awaiting_preview_approval"
+            status = "completed"
+        elif pending:
             status = "running" if counts["running"] or counts["generated"] else "queued"
         elif counts["failed"] and counts["generated"]:
             status = "partial_failed"

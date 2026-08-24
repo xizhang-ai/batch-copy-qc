@@ -494,6 +494,52 @@ class Repository:
             ) from exc
         return self.get_item(item_id)
 
+    def append_preview_slots(
+        self, run_id: str, expected_preview_item_count: int, allocations: list[tuple[str, int]]
+    ) -> list[dict[str, Any]]:
+        """Append missing frozen slots once; repeat approval is intentionally a no-op."""
+        try:
+            self.connection.execute("BEGIN IMMEDIATE")
+            run = self.connection.execute(
+                "SELECT * FROM generation_runs WHERE id=?", (run_id,)
+            ).fetchone()
+            if not run:
+                raise DomainError("RUN_NOT_FOUND", "Generation run not found", status_code=404)
+            if run["generation_mode"] != "preview":
+                raise DomainError("PREVIEW_CONFIRMATION_INVALID", "Run is not a preview", status_code=409)
+            if run["preview_item_count"] != expected_preview_item_count:
+                raise DomainError("PREVIEW_ITEM_COUNT_MISMATCH", "Preview item count changed", status_code=409)
+            if run["generation_phase"] == "full_running":
+                self.connection.commit()
+                return []
+            if run["generation_phase"] != "awaiting_preview_approval":
+                raise DomainError("PREVIEW_NOT_READY", "Preview is not ready for approval", status_code=409)
+            existing = {
+                (row["copy_type_id"], row["ordinal"])
+                for row in self.connection.execute(
+                    "SELECT copy_type_id,ordinal FROM copy_items WHERE run_id=?", (run_id,)
+                )
+            }
+            created_ids: list[str] = []
+            for copy_type_id, ordinal in allocations:
+                if (copy_type_id, ordinal) in existing:
+                    continue
+                item_id = new_id()
+                self.connection.execute(
+                    "INSERT INTO copy_items(id,run_id,copy_type_id,ordinal) VALUES (?,?,?,?)",
+                    (item_id, run_id, copy_type_id, ordinal),
+                )
+                created_ids.append(item_id)
+            self.connection.execute(
+                "UPDATE generation_runs SET generation_phase='full_running',preview_confirmed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                (run_id,),
+            )
+            self.connection.commit()
+        except Exception:
+            self.connection.rollback()
+            raise
+        return [self.get_item(item_id) for item_id in created_ids]
+
     def get_item(self, item_id: str) -> dict[str, Any]:
         row = self.connection.execute("SELECT * FROM copy_items WHERE id=?", (item_id,)).fetchone()
         if not row:

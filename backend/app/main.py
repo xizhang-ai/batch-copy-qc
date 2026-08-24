@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from .api.assistant import router as assistant_router
 from .api.copy_types import router as copy_types_router
 from .api.errors import install_error_handlers
 from .api.exports import router as exports_router
@@ -31,6 +32,7 @@ def create_app(
         lifespan=create_lifespan(resolved_settings, model_adapter, exporter),
     )
     install_error_handlers(app)
+    app.include_router(assistant_router)
     app.include_router(projects_router)
     app.include_router(copy_types_router)
     app.include_router(qc_rules_router)

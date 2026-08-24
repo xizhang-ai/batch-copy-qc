@@ -7,6 +7,7 @@
 - 已创建实施计划 `docs/superpowers/plans/2026-08-24-conversational-preview-flow.md`；本轮仅写计划，未开始对话能力、预览批次或新页面的编码。
 - 已开始实施：新增 AssistantAction/AssistantPlan/PreviewConfirmation 严格 schema，扩展 ModelAdapter 任务规划方法，并在 Fake/CLIPROXY 适配器实现结构化计划输出；4 项单元测试及 Ruff 通过。
 - 已完成持久化基础：005 迁移增加 assistant sessions/messages/action receipts 与 preview run 字段；Repository 完成消息、幂等收据和 preview run 写入，相关迁移/数据库测试 11 项通过。
+- 已完成后端交互主链路：新增 assistant session/message/action API，提案与落库操作分离且 action receipt 可幂等重放；preview run 按类型轮询创建最多 3 个槽位，处理结束暂停，确认后在同一 run 中追加剩余槽位。13 项接口/生成回归测试与 Ruff 通过。
 
 ## 2026-08-21
 
