@@ -35,3 +35,11 @@ it("starts a three-copy preview before offering continuation", async () => {
   expect(await screen.findByText("3 篇预览已就绪。", { exact: false })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "按此方向生成剩余 1 篇" })).toBeInTheDocument();
 });
+
+it("keeps Brief upload and the complete editor accessible from the workspace", async () => {
+  const user = userEvent.setup();
+  renderWorkspace();
+  await user.click(screen.getByRole("button", { name: "上传 Brief" }));
+  expect(await screen.findByRole("heading", { name: "上传项目 Brief" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "完整 Brief 编辑" })).toHaveAttribute("href", "/projects/p-demo/content");
+});
