@@ -8,6 +8,8 @@ test("真实前后端：项目 Brief 到 Fake AI QC 自动完成", async ({ page
   await page.getByRole("button", { name: "建立并添加 Brief" }).click();
 
   await expect(page.getByRole("heading", { name: "Real E2E 青柚气泡水" })).toBeVisible();
+  await page.getByRole("button", { name: "上传 Brief" }).click();
+  await expect(page.getByRole("heading", { name: "上传项目 Brief" })).toBeVisible();
   await page.getByLabel("Brief 原文").fill([
     "产品：青柚气泡水 330ml",
     "人群：办公室通勤人群",
@@ -15,9 +17,9 @@ test("真实前后端：项目 Brief 到 Fake AI QC 自动完成", async ({ page
   ].join("\n"));
   await page.getByRole("button", { name: "AI 拆解 Brief" }).click();
   await expect(page.getByText(/已从.*拆出/)).toBeVisible();
-  await page.getByRole("button", { name: "保存并确认项目内容" }).click();
-  await expect(page.getByText("内容已确认")).toBeVisible();
-  await page.getByRole("link", { name: /下一步：帖子类型/ }).click();
+  await page.getByRole("button", { name: "确认并写入项目" }).click();
+  await expect(page.getByText("已整理项目内容")).toBeVisible();
+  await page.getByRole("link", { name: "高级配置" }).click();
 
   await page.getByRole("button", { name: "添加帖子类型" }).first().click();
   await page.getByLabel("帖子类型名称").fill("通勤场景实测");

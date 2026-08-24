@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import type { ClassifiedTypeFile, CopyType } from "../../api/contracts";
 import { api } from "../../api/service";
 import { EmptyState } from "../../components/EmptyState";
@@ -10,14 +10,16 @@ import { CopyTypeEditor } from "./CopyTypeEditor";
 
 export function CopyTypesPage() {
   const { id = "" } = useParams();
+  const [searchParams] = useSearchParams();
+  const requestedTypeId = searchParams.get("type") ?? "";
   const [types, setTypes] = useState<CopyType[]>([]);
   const [files, setFiles] = useState<ClassifiedTypeFile[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const classifyInputRef = useRef<HTMLInputElement>(null);
-  const load = async () => { setLoading(true); try { const nextTypes = await api.listCopyTypes(id); const nextFiles = await api.listClassifiedFiles(id); setTypes(nextTypes); setFiles(nextFiles); setSelectedId((current) => current || nextTypes[0]?.id || ""); } catch (err) { setError((err as Error).message); } finally { setLoading(false); } };
-  useEffect(() => { void load(); }, [id]);
+  const load = async () => { setLoading(true); try { const nextTypes = await api.listCopyTypes(id); const nextFiles = await api.listClassifiedFiles(id); setTypes(nextTypes); setFiles(nextFiles); setSelectedId((current) => current || (nextTypes.some((type) => type.id === requestedTypeId) ? requestedTypeId : nextTypes[0]?.id || "")); } catch (err) { setError((err as Error).message); } finally { setLoading(false); } };
+  useEffect(() => { void load(); }, [id, requestedTypeId]);
   const add = async () => { const created = await api.createCopyType(id); setTypes([...types, created]); setSelectedId(created.id); };
   const selected = types.find((item) => item.id === selectedId);
   return <div className="page">

@@ -8,12 +8,14 @@ test("从项目 Brief 配置到新生成批次", async ({ page }) => {
   await page.getByRole("button", { name: "建立并添加 Brief" }).click();
 
   await expect(page.getByRole("heading", { name: "E2E 清爽气泡水" })).toBeVisible();
+  await page.getByRole("button", { name: "上传 Brief" }).click();
+  await expect(page.getByRole("heading", { name: "上传项目 Brief" })).toBeVisible();
   await page.getByLabel("Brief 原文").fill("品牌微沫，青柚味气泡水 330ml。禁止减肥、燃脂和零负担。用于午后工位场景。");
   await page.getByRole("button", { name: "AI 拆解 Brief" }).click();
   await expect(page.getByText(/已从\s*粘贴文本\s*拆出/)).toBeVisible();
-  await page.getByRole("button", { name: "保存并确认项目内容" }).click();
-  await expect(page.getByText("内容已确认")).toBeVisible();
-  await page.getByRole("link", { name: /下一步：帖子类型/ }).click();
+  await page.getByRole("button", { name: "确认并写入项目" }).click();
+  await expect(page.getByText("已整理项目内容")).toBeVisible();
+  await page.getByRole("link", { name: "高级配置" }).click();
 
   await page.getByRole("button", { name: "添加帖子类型" }).first().click();
   await page.getByLabel("帖子类型名称").fill("通勤场景");
@@ -51,4 +53,15 @@ test("飞书预览只输出已完成文案", async ({ page }) => {
   await expect(page.getByText(/本次排除：待人工 1 篇/)).toBeVisible();
   await page.getByRole("button", { name: "使用模拟输出" }).click();
   await expect(page.getByText("8月种草·当前批次")).toBeVisible();
+});
+
+test("任务工作台复用已有帖子类型，只更新用户指定的篇数", async ({ page }) => {
+  await page.goto("/projects/p-demo");
+  await page.getByLabel("告诉我你想做什么").fill("给新品做 5 篇通勤种草");
+  await page.getByRole("button", { name: "发送" }).click();
+
+  await expect(page.getByText("我准备这样做")).toBeVisible();
+  await page.getByRole("button", { name: "应用到任务" }).click();
+  await expect(page.getByText("已更新任务配置。")).toBeVisible();
+  await expect(page.getByText("已设置 5 篇目标文案。")).toBeVisible();
 });

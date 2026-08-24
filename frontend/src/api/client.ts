@@ -3,9 +3,9 @@ import type { ApiErrorShape } from "./contracts";
 export class ApiError extends Error {
   readonly code: string;
   readonly status: number;
-  readonly details: Record<string, unknown>;
+  readonly details: unknown;
 
-  constructor(code: string, message: string, status = 0, details: Record<string, unknown> = {}) {
+  constructor(code: string, message: string, status = 0, details: unknown = {}) {
     super(message);
     this.name = "ApiError";
     this.code = code;

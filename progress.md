@@ -19,6 +19,12 @@
 - 策略要求需求/场景优先、事实支持的细节、条件化的主观表达、短段落和按需收尾；禁止虚构亲测、反馈、数据、缺点或身份，并限制绝对化表达。
 - 每次 generation run 的冻结快照会保存策略名称和版本；全量后端回归 127 passed，Ruff 通过。
 - 修复工作台反馈的 `Rules action needs rules`：任务助手若返回缺少非空规则列表的 `replace_project_rules` 动作，应用时会安全跳过并保留既有规则，不阻断同一提案中的其他配置；CLIPROXY 规划指令也明确禁止生成该不完整动作。全量后端回归 128 passed，Ruff 通过。
+- 用户反馈连续出现生成前置条件与状态误导。本轮开始端到端审计：先验证工作台 API、任务助手动作、类型生成依据、生成 run 汇总和页面交互，再集中修复并复跑全量回归。
+- 审计确认三项根因：generation-runs 列表未调用 summary，旧批次停留在 `queued/full_running`；任务助手没有既有帖子类型上下文，导致“做 5 篇”会创建空类型；前端丢弃 `GENERATION_VALIDATION_FAILED` 的结构化 details，仅显示英文总错误。
+- 修复：run 列表改为返回实时汇总状态；任务助手收到可用类型摘要，单个可用类型只更新其数量；禁止新建没有类型 Brief 或非空描述要求的类型；CLIPROXY 与 Fake planner、Mock 一致遵守该约束。工作台将失败、排队、生成中分开呈现，并把缺失的具体帖子类型用中文说明和直达链接显示出来；链接会定位到异常类型。
+- 同步迁移浏览器回归到工作台的新 Brief 入口，并新增“对话复用已有类型、只更新数量”及“异常类型直达编辑”的覆盖。首次 E2E 发现旧测试仍假设新建项目自动展开 Brief，已修正后复跑通过。
+- 最终验收：后端 `pytest backend/tests -q` 131 passed、Ruff 通过；前端 Vitest 13 文件/27 项、TypeScript、production build 通过；Mock Playwright 4/4、真实 FastAPI + SQLite + Fake Adapter Playwright 1/1 通过。实际 API 确认“启赋家族”历史第 3/2 批为 `partial_failed/completed`、第 1 批为 `completed/completed`；实际页面标题已显示“处理生成异常”，不再显示“系统正在生成文案”。
+- 未删除用户现有的空“家族种草”帖子类型：它由旧助手错误创建但仍可能是用户要继续编辑的方向。现在会明确跳转到该类型，用户可补充类型 Brief/描述要求/参考案例，或在该页删除它；项目 Brief、规则、既有“家族双罐”参考和历史批次未改动。
 
 ## 2026-08-21
 

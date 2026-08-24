@@ -67,23 +67,54 @@ class FakeModelAdapter:
         quantity_match = re.search(r"(?:生成|写|做)\s*(\d{1,3})\s*篇", user_message)
         quantity = int(quantity_match.group(1)) if quantity_match else None
         actions: list[AssistantAction] = []
-        if quantity:
-            actions.append(
-                AssistantAction(
-                    client_action_id="assistant-copy-type",
-                    kind="upsert_copy_type",
-                    payload={"name": "默认帖子类型", "quantity": quantity},
-                )
+        copy_types = project.get("copy_types", [])
+        runnable_types = [
+            copy_type
+            for copy_type in copy_types
+            if isinstance(copy_type, dict)
+            and (
+                copy_type.get("has_brief")
+                or copy_type.get("has_confirmed_references")
+                or copy_type.get("has_description_requirements")
             )
+        ]
+        blockers: list[str] = []
+        if quantity:
+            if len(runnable_types) == 1:
+                copy_type = runnable_types[0]
+                actions.append(
+                    AssistantAction(
+                        client_action_id=f"assistant-copy-type-{_stable_number([project.get('id'), len(history), user_message])}",
+                        kind="upsert_copy_type",
+                        payload={"id": copy_type["id"], "quantity": quantity},
+                    )
+                )
+            elif not copy_types:
+                actions.append(
+                    AssistantAction(
+                        client_action_id=f"assistant-copy-type-{_stable_number([project.get('id'), len(history), user_message])}",
+                        kind="upsert_copy_type",
+                        payload={
+                            "name": "默认帖子类型",
+                            "quantity": quantity,
+                            "brief_text": user_message.strip(),
+                        },
+                    )
+                )
+            elif len(runnable_types) == 0:
+                blockers.append("现有帖子类型还缺少类型 Brief、描述要求或已确认的参考案例。")
+            else:
+                blockers.append("当前有多个可用帖子类型，请说明这次要调整哪一个。")
         if user_message.strip():
             actions.append(
                 AssistantAction(
-                    client_action_id="assistant-project",
+                    client_action_id=f"assistant-project-{_stable_number([project.get('id'), len(history), user_message])}",
                     kind="set_project",
                     payload={"name": str(project.get("name") or "新种草任务")},
                 )
             )
-        blockers = [] if quantity else ["请告诉我希望生成多少篇文案。"]
+        if not quantity:
+            blockers.append("请告诉我希望生成多少篇文案。")
         return AssistantPlan(
             summary=f"我会按你的描述整理任务{f'，先准备 {quantity} 篇文案' if quantity else ''}。",
             blockers=blockers,

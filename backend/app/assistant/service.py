@@ -1,11 +1,21 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from ..db.repositories import Repository
 from ..domain.errors import DomainError
 from ..domain.schemas import AssistantAction, AssistantPlan
 from ..generation.service import GenerationService
+
+
+def _has_nonempty_description_requirements(value: Any) -> bool:
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError:
+            return bool(value.strip())
+    return isinstance(value, dict) and any(str(item).strip() for item in value.values())
 
 
 class AssistantService:
@@ -27,6 +37,25 @@ class AssistantService:
             "brand": project["brand"],
             "category": project["category"],
             "confirmed": bool(project["confirmed"]),
+            "copy_types": [
+                {
+                    "id": copy_type["id"],
+                    "name": copy_type["name"],
+                    "quantity": copy_type["quantity"],
+                    "has_brief": bool(copy_type["brief_text"].strip()),
+                    "has_confirmed_references": bool(
+                        copy_type["use_reference_examples"]
+                        and copy_type["style_profile_confirmed"]
+                    ),
+                    "has_description_requirements": bool(
+                        copy_type["use_description_requirements"]
+                        and _has_nonempty_description_requirements(
+                            copy_type["description_requirements_json"]
+                        )
+                    ),
+                }
+                for copy_type in self.repository.list_copy_types(project_id)
+            ],
         }
         plan: AssistantPlan = await self.model_adapter.plan_project_setup(
             model_project, history, content
@@ -99,6 +128,20 @@ class AssistantService:
                 item = self.repository.update_copy_type(str(copy_type_id), update_values)
             else:
                 name = str(values.get("name") or "默认帖子类型").strip()
+                brief_text = str(values.get("brief_text") or "").strip()
+                requirements = values.get("description_requirements")
+                has_description_basis = bool(
+                    values.get("use_description_requirements")
+                    and isinstance(requirements, dict)
+                    and any(str(value).strip() for value in requirements.values())
+                )
+                if not brief_text and not has_description_basis:
+                    return {
+                        "kind": action.kind,
+                        "project_id": project_id,
+                        "skipped": True,
+                        "reason": "帖子类型缺少内容依据，未创建。请提供类型 Brief 或具体描述要求。",
+                    }
                 item = self.repository.create_copy_type(
                     project_id,
                     name=name,

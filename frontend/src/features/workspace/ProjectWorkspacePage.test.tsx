@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, vi } from "vitest";
 import { ProjectWorkspacePage } from "./ProjectWorkspacePage";
 import { resetMockApi } from "../../api/mockService";
 import { api } from "../../api/service";
+import { ApiError } from "../../api/client";
 
 function renderWorkspace() {
   return render(<MemoryRouter initialEntries={["/projects/p-demo"]}><Routes><Route path="/projects/:id" element={<ProjectWorkspacePage />} /></Routes></MemoryRouter>);
@@ -42,4 +43,28 @@ it("keeps Brief upload and the complete editor accessible from the workspace", a
   await user.click(screen.getByRole("button", { name: "上传 Brief" }));
   expect(await screen.findByRole("heading", { name: "上传项目 Brief" })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "完整 Brief 编辑" })).toHaveAttribute("href", "/projects/p-demo/content");
+});
+
+it("explains which post type is blocking generation without asking for the project Brief again", async () => {
+  const user = userEvent.setup();
+  vi.spyOn(api, "createGenerationRun").mockRejectedValue(new ApiError("GENERATION_VALIDATION_FAILED", "Generation prerequisites are not met", 400, [
+    { code: "COPY_TYPE_INPUT_REQUIRED", resource_id: "ct-commute" },
+  ]));
+  renderWorkspace();
+  const preview = await screen.findByRole("button", { name: "先生成 3 篇预览" });
+  await waitFor(() => expect(preview).toBeEnabled());
+
+  await user.click(preview);
+
+  expect(await screen.findByText(/通勤包里常备.*还没有自己的内容依据/)).toBeInTheDocument();
+  expect(screen.getByText(/无需重新上传项目 Brief/)).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "补充帖子类型" })).toHaveAttribute("href", "/projects/p-demo/types?type=ct-commute");
+});
+
+it("shows failed historical batches as exceptions instead of pretending they are generating", async () => {
+  vi.spyOn(api, "listGenerationRuns").mockResolvedValue([{ id: "failed-run", project_id: "p-demo", status: "partial_failed", total_requested: 4, batch_number: 9, label: "第 9 批", archived: false, created_at: "2026-08-25T00:00:00Z", generation_mode: "full", generation_phase: "completed" }]);
+  renderWorkspace();
+
+  expect(await screen.findByRole("heading", { name: "处理生成异常" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "查看本批异常" })).toHaveAttribute("href", "/projects/p-demo/board?run=failed-run");
 });

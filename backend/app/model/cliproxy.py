@@ -44,7 +44,12 @@ INSTRUCTIONS: dict[str, str] = {
         "每个动作都必须有稳定、非空的 client_action_id。只有影响生成安全的缺失信息"
         "才能放 blockers，最多三个；非关键推断放 assumptions。replace_project_rules 仅在用户明确"
         "给出了完整项目规则时使用，payload.rules 必须是非空数组，且每条规则都有非空 statement；"
-        "不能确定规则时绝不输出该 action。返回严格 JSON。"
+        "不能确定规则时绝不输出该 action。project.copy_types 是现有帖子类型摘要："
+        "当只有一个可用类型且用户只是调整篇数或高层方向时，必须用它的 id 更新数量，"
+        "保留既有 Brief、参考和规则，绝不可另建空类型。仅在用户明确要新增类型时才能新增，"
+        "且 upsert_copy_type 必须同时携带非空 brief_text，或 use_description_requirements=true"
+        "和至少一条非空 description_requirements；做不到时不要输出该 action，而是说明需要补充什么。"
+        "不能用 use_reference_examples 创建新类型，因为对话不会提供完整参考帖。返回严格 JSON。"
     ),
     "parse_brief": (
         "你是 Brief 信息抽取器。只抽取输入原文明确存在的信息，不推测、不补充事实。"

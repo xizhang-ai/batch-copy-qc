@@ -1,7 +1,11 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { beforeEach } from "vitest";
 import { CopyTypesPage } from "./CopyTypesPage";
+import { mockApi, resetMockApi } from "../../api/mockService";
+
+beforeEach(() => resetMockApi());
 
 it("starts an unconfigured project with no templates or suggested types", async () => {
   render(<MemoryRouter initialEntries={["/projects/p-empty/types"]}><Routes><Route path="/projects/:id/types" element={<CopyTypesPage />} /></Routes></MemoryRouter>);
@@ -52,4 +56,11 @@ it("persists assigning and clearing a classified file", async () => {
 
   render(route);
   expect(await screen.findByLabelText("聚餐场景参考.md归属")).toHaveValue("");
+});
+
+it("opens the exact post type requested by a generation blocker", async () => {
+  const created = await mockApi.createCopyType("p-demo");
+  render(<MemoryRouter initialEntries={[`/projects/p-demo/types?type=${created.id}`]}><Routes><Route path="/projects/:id/types" element={<CopyTypesPage />} /></Routes></MemoryRouter>);
+
+  expect(await screen.findByLabelText("帖子类型名称")).toHaveValue("");
 });

@@ -81,8 +81,9 @@ def list_runs(
     include_archived: bool = False,
     repository: Repository = Depends(get_repository),
 ):
+    service = GenerationService(repository)
     return [
-        _public_run(run)
+        _public_run(service.summary(run["id"]))
         for run in repository.list_generation_runs(
             project_id, include_archived=include_archived
         )

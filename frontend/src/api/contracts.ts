@@ -243,7 +243,7 @@ export interface ExportRun {
 }
 
 export interface ApiErrorShape {
-  error: { code: string; message: string; details?: Record<string, unknown> };
+  error: { code: string; message: string; details?: unknown };
 }
 
 export interface ReviewPayload {

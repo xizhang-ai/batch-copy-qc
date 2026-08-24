@@ -86,6 +86,26 @@ def test_batches_are_numbered_and_can_be_hidden_and_restored(client):
     assert client.get(f"/api/projects/{project['id']}/board").json()["run_id"] == second["id"]
 
 
+def test_list_runs_returns_current_summary_instead_of_stale_generation_phase(client):
+    project, copy_type = _configured_project(client)
+    repository = client.app.state.repository
+    run = repository.create_generation_run(project["id"], 1, {})
+    item = repository.create_item_slot(run["id"], copy_type["id"], 1)
+    repository.connection.execute(
+        "UPDATE copy_items SET generation_status='failed',error_code='MODEL_RESPONSE_INVALID' WHERE id=?",
+        (item["id"],),
+    )
+    repository.connection.commit()
+
+    response = client.get(f"/api/projects/{project['id']}/generation-runs")
+
+    assert response.status_code == 200
+    listed = response.json()[0]
+    assert listed["id"] == run["id"]
+    assert listed["status"] == "failed"
+    assert listed["generation_phase"] == "completed"
+
+
 def test_generation_validation_returns_all_issues(client):
     project = client.post("/api/projects", json={"name": "empty"}).json()
     response = client.post(f"/api/projects/{project['id']}/generation-runs", json={})
