@@ -154,7 +154,7 @@ strong, .numeric { font-variant-numeric: tabular-nums; }
 .stat-card > strong { grid-row: span 2; font-size: 28px; line-height: 34px; font-variant-numeric: tabular-nums; }
 .stat-card > small { color: var(--text-muted); }
 .mobile-status-tabs { display: none; }
-.board-grid { display: grid; grid-template-columns: repeat(5, minmax(240px, 1fr)); gap: var(--space-4); align-items: start; }
+.board-grid { display: grid; grid-template-columns: repeat(3, minmax(240px, 1fr)); gap: var(--space-4); align-items: start; }
 .board-column { min-height: 520px; padding: var(--space-3); border-radius: var(--radius-card); background: var(--surface-muted); }
 .board-column.status-pending { background: var(--status-pending); }
 .board-column.status-qc { background: var(--status-qc); }

@@ -8,7 +8,7 @@ import { Skeleton } from "../../components/Skeleton";
 import { ReviewOverlay } from "../review/ReviewOverlay";
 import { BoardColumn } from "./BoardColumn";
 import { BoardStats } from "./BoardStats";
-import { boardStatuses, statusPresentation } from "./statusPresentation";
+import { boardViewGroups } from "./statusPresentation";
 import { useBoardPolling } from "./useBoardPolling";
 
 export function BoardPage() {
@@ -168,8 +168,8 @@ export function BoardPage() {
     {data?.run_archived && <div className="notice warning batch-archive-notice"><strong>这是已隐藏的第 {data.batch_number} 批。</strong><span>它不会出现在默认看板或默认飞书输出中；需要时可恢复。</span></div>}
     {loading && !data ? <div className="panel section-panel"><Skeleton lines={10} /></div> : data && <>
       <BoardStats board={data} />
-      <div className="mobile-status-tabs" role="tablist" aria-label="看板状态">{boardStatuses.map((status) => <button role="tab" aria-selected={mobileStatus === status} className={mobileStatus === status ? "active" : ""} onClick={() => setMobileStatus(status)} key={status}>{statusPresentation[status].label}<span>{filtered.filter((item) => item.workflow_status === status).length}</span></button>)}</div>
-      <div className="board-grid">{boardStatuses.map((status) => <div className={`board-column-wrap${mobileStatus === status ? " mobile-active" : ""}`} key={status}><BoardColumn status={status} items={filtered.filter((item) => item.workflow_status === status)} onReview={(item, trigger) => { setReviewItem(item); setReturnFocus(trigger); }} onRetry={retry} /></div>)}</div>
+      <div className="mobile-status-tabs" role="tablist" aria-label="看板状态">{boardViewGroups.map((group) => <button role="tab" aria-selected={mobileStatus === group.statuses[0]} className={mobileStatus === group.statuses[0] ? "active" : ""} onClick={() => setMobileStatus(group.statuses[0])} key={group.id}>{group.label}<span>{filtered.filter((item) => group.statuses.includes(item.workflow_status)).length}</span></button>)}</div>
+      <div className="board-grid">{boardViewGroups.map((group) => <div className={`board-column-wrap${group.statuses.includes(mobileStatus) ? " mobile-active" : ""}`} key={group.id}><BoardColumn group={group} items={filtered.filter((item) => group.statuses.includes(item.workflow_status))} onReview={(item, trigger) => { setReviewItem(item); setReturnFocus(trigger); }} onRetry={retry} /></div>)}</div>
     </>}
     {reviewItem && <ReviewOverlay item={reviewItem} returnFocus={returnFocus} onClose={() => setReviewItem(undefined)} onItemChange={(updated) => { updateItem(updated); setReviewItem(updated.workflow_status === "human_review" ? updated : undefined); }} />}
 
