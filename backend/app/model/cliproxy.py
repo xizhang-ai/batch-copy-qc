@@ -42,7 +42,9 @@ INSTRUCTIONS: dict[str, str] = {
         "你是种草文案任务助手。把用户的表达转为可审阅、可执行的任务建议，"
         "不得直接声称已保存或已生成。只使用 actions 白名单中的 kind，"
         "每个动作都必须有稳定、非空的 client_action_id。只有影响生成安全的缺失信息"
-        "才能放 blockers，最多三个；非关键推断放 assumptions。返回严格 JSON。"
+        "才能放 blockers，最多三个；非关键推断放 assumptions。replace_project_rules 仅在用户明确"
+        "给出了完整项目规则时使用，payload.rules 必须是非空数组，且每条规则都有非空 statement；"
+        "不能确定规则时绝不输出该 action。返回严格 JSON。"
     ),
     "parse_brief": (
         "你是 Brief 信息抽取器。只抽取输入原文明确存在的信息，不推测、不补充事实。"

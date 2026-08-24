@@ -51,9 +51,11 @@ class AssistantService:
             result = self._apply_action(project_id, action)
             self.repository.save_action_receipt(session["id"], action.client_action_id, result)
             results.append(result)
-        self.repository.append_assistant_message(
-            session["id"], "system", "已按你的确认更新任务配置。"
-        )
+        if any(not result.get("skipped") for result in results):
+            message = "已按你的确认更新任务配置。"
+        else:
+            message = "未应用不完整的任务建议，请补充明确要求后再试。"
+        self.repository.append_assistant_message(session["id"], "system", message)
         return results
 
     def _apply_action(self, project_id: str, action: AssistantAction) -> dict[str, Any]:
@@ -106,8 +108,17 @@ class AssistantService:
             return {"kind": action.kind, "project_id": project_id, "copy_type_id": item["id"]}
         if action.kind == "replace_project_rules":
             rules = payload.get("rules")
-            if not isinstance(rules, list):
-                raise DomainError("ASSISTANT_ACTION_INVALID", "Rules action needs rules", status_code=422)
+            if (
+                not isinstance(rules, list)
+                or not rules
+                or any(not isinstance(rule, dict) or not str(rule.get("statement", "")).strip() for rule in rules)
+            ):
+                return {
+                    "kind": action.kind,
+                    "project_id": project_id,
+                    "skipped": True,
+                    "reason": "项目规则未明确，未覆盖现有规则。",
+                }
             for rule in self.repository.list_rules(project_id):
                 if rule["scope"] == "project":
                     self.repository.delete_rule(rule["id"])

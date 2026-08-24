@@ -31,6 +31,30 @@ def test_apply_actions_is_idempotent(client):
     assert client.get(f"/api/projects/{project['id']}").json()["name"] == "通勤种草"
 
 
+def test_apply_actions_skips_an_incomplete_model_rule_action(client):
+    project = client.post("/api/projects", json={"name": "助手项目"}).json()
+    payload = {
+        "actions": [
+            {
+                "client_action_id": "missing-rules",
+                "kind": "replace_project_rules",
+                "payload": {},
+            },
+            {
+                "client_action_id": "set-project-name",
+                "kind": "set_project",
+                "payload": {"name": "通勤种草"},
+            },
+        ]
+    }
+
+    response = client.post(f"/api/projects/{project['id']}/assistant/actions:apply", json=payload)
+
+    assert response.status_code == 200
+    assert response.json()["results"][0]["skipped"] is True
+    assert client.get(f"/api/projects/{project['id']}").json()["name"] == "通勤种草"
+
+
 def test_assistant_session_includes_messages_and_plan(client):
     project = client.post("/api/projects", json={"name": "助手项目"}).json()
     client.post(
