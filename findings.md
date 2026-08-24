@@ -90,3 +90,9 @@
 - 用户认可后，剩余文案必须加入同一个 generation run，而不是创建第二批；这样版本、QC、审核与飞书导出链条保持统一。
 - 当前后端的 generation run 已使用冻结配置快照和 item slot；通过为 run 增加 preview phase、并在确认时创建缺失 slot，即可实现同批继续，不需要重写 QC worker。
 - 看板前端已先调整为三个用户组：系统处理中（pending_ai_qc/ai_qc_running/ai_rewrite_running）、需人工处理（human_review）、已完成（completed）；内部状态保持不变。
+# 红书种草写作策略放置结论
+
+- 用户确认该能力是产品全局默认的“生成工具”，不是项目字段或帖子类型字段。
+- 正确调用点是 `GenerationWorker.process()` 的生成分支，在 `ModelAdapter.generate_copy()` 之前；Brief 解析、对话助手、看板、导出和 QC 都不调用。
+- 策略需要是稳定、无模型调用的纯指令构建器，以避免模型漏调、增加成本或造成非确定性。
+- 每个 generation run 的配置快照写入策略名称和版本，确保历史批次能说明当时使用的内置写作逻辑。

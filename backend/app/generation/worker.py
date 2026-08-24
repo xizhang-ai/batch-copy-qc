@@ -8,6 +8,7 @@ from typing import Any
 from ..db.repositories import Repository
 from ..domain.schemas import GenerationContext, ReferenceExample, ReferenceStyleProfile
 from .service import normalize_project_facts
+from .xiaohongshu_seed_strategy import build_instruction
 
 
 class GenerationWorker:
@@ -112,9 +113,10 @@ class GenerationWorker:
                 style_profile=ReferenceStyleProfile.model_validate(profile_raw)
                 if profile_raw
                 else None,
-                description_requirements=list(
-                    json.loads(copy_type["description_requirements_json"]).values()
-                ),
+                description_requirements=[
+                    build_instruction(),
+                    *json.loads(copy_type["description_requirements_json"]).values(),
+                ],
                 must_include=json.loads(copy_type["must_include_json"]),
                 must_avoid=json.loads(copy_type["must_avoid_json"]),
                 effective_rules=[rule["statement"] for rule in copy_type["effective_rules"]],

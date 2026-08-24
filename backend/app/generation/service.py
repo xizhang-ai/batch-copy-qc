@@ -8,6 +8,7 @@ from uuid import uuid4
 from ..db.repositories import Repository
 from ..domain.errors import DomainError
 from ..qc.merge_rules import merge_rules
+from .xiaohongshu_seed_strategy import STRATEGY_NAME, STRATEGY_VERSION
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,7 +166,15 @@ class GenerationService:
                     "rule_conflicts": [asdict(conflict) for conflict in merged.conflicts],
                 }
             )
-        snapshot = {"project": project, "copy_types": snapshot_types, "rules": rules}
+        snapshot = {
+            "project": project,
+            "copy_types": snapshot_types,
+            "rules": rules,
+            "generation_strategy": {
+                "name": STRATEGY_NAME,
+                "version": STRATEGY_VERSION,
+            },
+        }
         requested = sum(copy_type["quantity"] for copy_type in types)
         allocations = self._slot_allocations(types)
         preview_item_count = min(3, len(allocations)) if generation_mode == "preview" else 0
